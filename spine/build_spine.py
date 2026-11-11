@@ -224,24 +224,25 @@ while x <= SPINE_X1 - 20.0:
     lamp_index += 1
     x += 40.0
 
-# --- Lore terminals: one per lore file, along the aisle -------------------------
-# Terminal i opens lore file i (alphabetical). The viewer reads the mapping from the JSON.
-LORE_DIR = r"C:\Users\jaspe\Documents\agentbox\lore"
-lore_files = sorted(f for f in os.listdir(LORE_DIR) if f.lower().endswith(".md"))
-TERMINAL_SPACING = 22.0
-TERMINAL_START = 130.0
-TERMINAL_MAT = make_mat("Terminal", (0.12, 0.13, 0.15), rough=0.5, metal=0.3)
-SCREEN_MAT = make_mat("TerminalScreen", (0.45, 0.90, 1.0), rough=0.3, emit=1.2)
-terminal_records = []
-for i, fname in enumerate(lore_files):
-    x = TERMINAL_START + TERMINAL_SPACING * i
-    if x > SPINE_X1 - 20.0:
-        raise SystemExit(f"Not enough Spine length for {len(lore_files)} terminals")
-    y = -6.5 if i % 2 == 0 else 6.5
-    dy = 0.26 if y < 0 else -0.26          # screen faces the centre aisle
-    box(f"Terminal_{i}", x - 0.35, x + 0.35, y - 0.25, y + 0.25, 0, 1.5, TERMINAL_MAT, collide=True)
-    box(f"TerminalScreen_{i}", x - 0.30, x + 0.30, y + dy - 0.01, y + dy + 0.01, 0.9, 1.35, SCREEN_MAT)
-    terminal_records.append({"x": x, "y": y, "file": fname})
+# --- Cabin doors on the hall fronts, with a knock light above each -------------
+# Each hall has one door per side. The light is a separate material so the viewer can flash it
+# when an NPC knocks. The door stands just in front of the hall face (toward the aisle).
+DOOR_MAT = make_mat("Door", (0.36, 0.24, 0.16), rough=0.7)
+door_records = []
+x = SPINE_X0 + 20.0
+hall_k = 0
+while x + HALL_LEN <= SPINE_X1 - 20.0:
+    cx = x + HALL_LEN / 2
+    # Port door sits at Y -10.96 .. -10.82, stbd at 10.82 .. 10.96 (just in front of the hall face).
+    for side, face_y, y0, y1 in (("port", -10.9, -10.96, -10.82),
+                                 ("stbd", 10.9, 10.82, 10.96)):
+        box(f"Door_{side}_{hall_k}", cx - 1.0, cx + 1.0, y0, y1, 0.0, 2.2, DOOR_MAT)
+        light_mat = make_mat(f"DoorLight_{side}_{hall_k}", (1.0, 0.85, 0.5), rough=0.5, emit=0.05)
+        box(f"DoorLight_{side}_{hall_k}", cx - 0.3, cx + 0.3, y0, y1, 2.35, 2.6, light_mat)
+        door_records.append({"name": f"Door_{side}_{hall_k}", "light": f"DoorLight_{side}_{hall_k}",
+                             "side": side, "x": cx, "y": face_y})
+    hall_k += 1
+    x += HALL_LEN + HALL_GAP
 
 # --- Electric train on the centre track ----------------------------------------
 # Three cars parented to an empty named "Train". The viewer moves the empty along X.
@@ -273,10 +274,10 @@ with open(json_path, "w") as f:
         "bounds": {"min": [SPINE_X0, -SPINE_HALF_WIDTH], "max": [SPINE_X1, SPINE_HALF_WIDTH]},
         "spine": {"x0": SPINE_X0, "x1": SPINE_X1, "length": SPINE_X1 - SPINE_X0},
         "pois": poi_records,
-        "terminals": terminal_records,
+        "doors": door_records,
         "train": {"length": TRAIN_LENGTH, "half_width": 1.5, "speed": 6.94},
         "colliders": colliders,
     }, f, indent=2)
 
-print("EXPORTED", glb_path, "halls:", hall_index, "planters:", planter_index,
+print("EXPORTED", glb_path, "halls:", hall_index, "doors:", len(door_records), "planters:", planter_index,
       "lamps:", lamp_index, "colliders:", len(colliders))

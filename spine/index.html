@@ -20,11 +20,30 @@
     position: absolute; top: 10px; right: 10px; background: rgba(0, 0, 0, 0.5);
     border-radius: 4px; pointer-events: none;
   }
+  #notice {
+    position: absolute; top: 56px; left: 50%; transform: translateX(-50%); color: #fff;
+    font-size: 14px; background: rgba(0, 0, 0, 0.7); padding: 6px 12px; border-radius: 4px;
+    pointer-events: none; display: none; white-space: nowrap;
+  }
+  #notice.gold { color: #ffd66b; }
+  #knock {
+    position: absolute; top: 96px; left: 50%; transform: translateX(-50%); color: #cfe9ff;
+    font-size: 13px; font-style: italic; background: rgba(0, 0, 0, 0.5); padding: 4px 10px;
+    border-radius: 4px; pointer-events: none; display: none; white-space: nowrap;
+  }
   #prompt {
     position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); color: #fff;
     font-size: 15px; background: rgba(0, 0, 0, 0.6); padding: 6px 12px; border-radius: 4px;
     pointer-events: none; display: none;
   }
+  #dialogue {
+    position: absolute; bottom: 64px; left: 50%; transform: translateX(-50%);
+    width: min(720px, 92vw); box-sizing: border-box; color: #fff; background: rgba(12, 14, 18, 0.85);
+    padding: 10px 14px; border-radius: 6px; pointer-events: none; display: none; line-height: 1.45;
+  }
+  #dialogue .who { color: #ffd66b; font-weight: bold; font-size: 14px; }
+  #dialogue .text { font-size: 15px; margin-top: 4px; }
+  #dialogue .hint { color: #9aa; font-size: 11px; margin-top: 6px; }
   #panel {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
     width: min(780px, 92vw); max-height: 84vh; box-sizing: border-box; display: none;
@@ -38,7 +57,6 @@
     overflow: auto; white-space: pre-wrap; font-size: 13px; line-height: 1.5;
     flex: 1; min-height: 0; padding-right: 6px;
   }
-  #psource { color: #aab; font-size: 11px; margin-top: 8px; }
 </style>
 <script type="importmap">
 {
@@ -50,26 +68,32 @@
 </script>
 </head>
 <body>
-<div id="overlay"><div>Click to start<br><small>WASD / arrows to walk, Shift to run, mouse to look, Esc to release<br>E to interact, J for the lore journal</small></div></div>
+<div id="overlay"><div>Click to start<br><small>WASD / arrows to walk, Shift to run, mouse to look, Esc to release<br>E to talk and interact, J for the journal</small></div></div>
 <div id="hud">The Spine - Halcyon Meridian</div>
 <canvas id="map" width="360" height="56"></canvas>
+<div id="notice"></div>
+<div id="knock"></div>
 <div id="prompt"></div>
+<div id="dialogue"><div class="who"></div><div class="text"></div><div class="hint">E to continue</div></div>
 <div id="panel">
   <div class="top"><h3 id="ptitle"></h3><button id="pclose">Close</button></div>
   <div id="ptext"></div>
-  <div id="psource"></div>
 </div>
 
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+import { SNIPPETS } from './snippets.js';
 
 const PLAYER_RADIUS = 0.35;
 const EYE_HEIGHT = 1.7;
 const WALK_SPEED = 3.0;   // m/s
 const RUN_SPEED = 6.0;    // m/s
-const LORE_TOTAL_KEY = 'halcyon-lore-found';
+const HEARD_KEY = 'halcyon-lore-heard';
+const NPC_COUNT = 60;
+const NPC_SEED = parseInt(new URLSearchParams(location.search).get('seed') || '1', 10);
+const TOPIC_COUNT = Object.keys(SNIPPETS).length;
 
 // --- Renderer, scene, camera --------------------------------------------------
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -92,11 +116,16 @@ scene.add(sun);
 // --- Controls and overlay -----------------------------------------------------
 const controls = new PointerLockControls(camera, renderer.domElement);
 const overlay = document.getElementById('overlay');
-let panelOpen = false;     // reading panel or journal is open (mouse is released)
-let journalOpen = false;
+let panelOpen = false;     // the journal is open (mouse is released)
+
+let audioCtx = null;
+function ensureAudio() {
+  if (audioCtx) return;
+  try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioCtx = null; }
+}
 
 overlay.addEventListener('click', () => controls.lock());
-controls.addEventListener('lock', () => overlay.classList.add('hidden'));
+controls.addEventListener('lock', () => { overlay.classList.add('hidden'); ensureAudio(); });
 controls.addEventListener('unlock', () => { if (!panelOpen) overlay.classList.remove('hidden'); });
 
 const keys = {};
@@ -112,6 +141,8 @@ document.addEventListener('keyup', e => { keys[e.code] = false; });
 let bounds = { min: [0, -20], max: [1600, 20] };
 let colliders = [];
 let spine = { x0: 0, x1: 1600, length: 1600 };
+let doors = [];       // { name, light, side, x, y, mat }
+let pois = [];
 
 // Electric train: an Object3D named "Train" in the GLB. Its position.x is the Blender X of
 // the rear (aft) end. It runs between the two ends of the Spine and pauses at each end.
@@ -213,85 +244,95 @@ function updateMovement(dt) {
   camera.position.z = -ny;
 }
 
-// --- Lore: loading, parsing, discovery ----------------------------------------
-let lore = {};          // file name -> { title, body }
-let discovered = new Set();
+// --- Lore: topics, discovery, journal ------------------------------------------
+// A "topic" is one lore file. You learn a topic by hearing one of its lines in conversation.
+let heard = new Set();
+let heardText = {};   // lore file -> the line the player heard
+let titles = {};      // lore file -> title (from the file's first heading)
+const TOPICS = Object.keys(SNIPPETS).sort();
 
-function parseLore(md, fallbackTitle) {
-  const lines = md.split(/\r?\n/);
-  const headingIndex = lines.findIndex(l => l.startsWith('# '));
-  const title = headingIndex >= 0 ? lines[headingIndex].replace(/^#\s*/, '').trim() : fallbackTitle;
-  if (headingIndex >= 0) lines.splice(headingIndex, 1);
-  const body = lines.join('\n')
-    .replace(/^#{2,6}\s*/gm, '')
-    .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/`([^`]+)`/g, '$1')
-    .trim();
-  return { title, body };
-}
-
-function loadDiscovered() {
+function loadHeard() {
   try {
-    const saved = JSON.parse(localStorage.getItem(LORE_TOTAL_KEY) || '[]');
-    discovered = new Set(saved);
+    const saved = JSON.parse(localStorage.getItem(HEARD_KEY) || '{}');
+    heardText = saved && !Array.isArray(saved) ? saved : {};
   } catch (e) {
-    discovered = new Set();
+    heardText = {};
   }
+  heard = new Set(Object.keys(heardText));
 }
 
-function discover(file) {
-  if (discovered.has(file)) return;
-  discovered.add(file);
-  try { localStorage.setItem(LORE_TOTAL_KEY, JSON.stringify([...discovered])); } catch (e) { /* storage may be unavailable */ }
+function saveHeard() {
+  try { localStorage.setItem(HEARD_KEY, JSON.stringify(heardText)); } catch (e) { /* storage unavailable */ }
 }
 
-// --- Interaction: nearest interactable, prompt, panel ------------------------
-const POI_RANGE = 5.0;
-const TERMINAL_RANGE = 2.5;
-const promptEl = document.getElementById('prompt');
+function titleOf(file) {
+  return titles[file] || file.replace(/\.md$/, '').replace(/_/g, ' ');
+}
+
+// Hearing a topic for the first time reveals it, and the line that was said is kept.
+// Returns true if it was new.
+function hear(file, line) {
+  if (heard.has(file)) return false;
+  heard.add(file);
+  heardText[file] = line || SNIPPETS[file];
+  saveHeard();
+  showNotice(`Learned: ${titleOf(file)}`, 4, true);
+  return true;
+}
+
+// --- Notices, dialogue, knock subtitles ---------------------------------------
+const noticeEl = document.getElementById('notice');
+const knockEl = document.getElementById('knock');
+const dialogueEl = document.getElementById('dialogue');
+const dialogueWho = dialogueEl.querySelector('.who');
+const dialogueText = dialogueEl.querySelector('.text');
+let noticeUntil = 0, knockUntil = 0, dialogueUntil = 0;
+
+function showNotice(text, seconds, gold) {
+  noticeEl.textContent = text;
+  noticeEl.classList.toggle('gold', !!gold);
+  noticeEl.style.display = 'block';
+  noticeUntil = performance.now() + seconds * 1000;
+}
+
+function showDialogue(who, text, seconds = 20) {
+  dialogueWho.textContent = who;
+  dialogueText.textContent = text;
+  dialogueEl.style.display = 'block';
+  dialogueUntil = performance.now() + seconds * 1000;
+}
+
+function updateOverlays() {
+  const now = performance.now();
+  if (now > noticeUntil) noticeEl.style.display = 'none';
+  if (now > knockUntil) knockEl.style.display = 'none';
+  if (now > dialogueUntil) dialogueEl.style.display = 'none';
+}
+
+// --- Journal (J) ----------------------------------------------------------------
 const panel = document.getElementById('panel');
 const panelTitle = document.getElementById('ptitle');
 const panelText = document.getElementById('ptext');
-const panelSource = document.getElementById('psource');
 const panelClose = document.getElementById('pclose');
-let interactables = [];   // { x, y, range, label(), use() }
-let nearest = null;
-
-function showPanel(title, text, source) {
-  panelTitle.textContent = title;
-  panelText.textContent = text;
-  panelSource.textContent = source || '';
-  panel.style.display = 'flex';
-  panelText.scrollTop = 0;
-}
-
-function openReading({ title, text, source }) {
-  panelOpen = true;
-  journalOpen = false;
-  showPanel(title, text, source);
-  overlay.classList.add('hidden');
-  controls.unlock();
-}
 
 function openJournal() {
-  const total = lore ? Object.keys(lore).length : 0;
-  const files = terminalFiles();
-  const lines = files.map(file => {
-    if (!discovered.has(file)) return '[ ] (not found yet)';
-    return `[x] ${lore[file].title}`;
-  });
+  const lines = TOPICS.map(file => heard.has(file)
+    ? `[x] ${titleOf(file)}\n      "${heardText[file]}"`
+    : '[ ] ???');
   panelOpen = true;
-  journalOpen = true;
-  showPanel(`Lore journal: ${discovered.size} / ${total} found`,
-    'Find the lore terminals along the Spine (the glowing screens) and press E to read them.\n\n' +
-    lines.join('\n'), 'Entries unlock when you use their terminal.');
+  panelTitle.textContent = `Journal: ${heard.size} / ${TOPIC_COUNT} heard`;
+  panelText.textContent =
+    'Talk to people on the Spine (E). They will tell you things, and each new topic is added here.\n' +
+    'Some of the ship\'s customs are only shared through knocks on the doors.\n\n' +
+    lines.join('\n\n');
+  panelText.scrollTop = 0;
+  panel.style.display = 'flex';
   overlay.classList.add('hidden');
   controls.unlock();
 }
 
 function closePanel() {
   panelOpen = false;
-  journalOpen = false;
   panel.style.display = 'none';
   controls.lock();
 }
@@ -299,21 +340,21 @@ function closePanel() {
 panelClose.addEventListener('click', closePanel);
 
 function toggleJournal() {
-  if (panelOpen && journalOpen) { closePanel(); return; }
-  if (!panelOpen) openJournal();
+  if (panelOpen) { closePanel(); return; }
+  openJournal();
 }
+
+// --- Interaction: nearest interactable, prompt --------------------------------
+const POI_RANGE = 5.0;
+const NPC_RANGE = 2.2;
+const promptEl = document.getElementById('prompt');
+let interactables = [];   // { x, y, range, label(), use() }
+let nearest = null;
 
 function useNearest() {
   if (panelOpen) { closePanel(); return; }
   if (nearest) nearest.use();
 }
-
-function terminalFiles() {
-  return terminals.map(t => t.file);
-}
-
-let terminals = [];
-let pois = [];
 
 function updateInteraction() {
   const bx = camera.position.x;
@@ -332,12 +373,103 @@ function updateInteraction() {
   }
 }
 
-// --- NPCs: people walking the Spine -------------------------------------------
-// Seeded so the layout is repeatable: ?seed=N changes it. Each NPC has a role and a line
-// paraphrased from the lore file named in "source".
-const NPC_COUNT = 60;
-const NPC_SEED = parseInt(new URLSearchParams(location.search).get('seed') || '1', 10);
+// --- Knock codes -----------------------------------------------------------------
+// Patterns from lore/knock_codes_and_cabin_talk.md. Beats: 'k' knock, 'q' quick knock,
+// 'L' long knock, '-' a pause.
+const KNOCK_TOPIC = 'knock_codes_and_cabin_talk.md';
+const KNOCK_PATTERNS = [
+  { meaning: 'Are you awake?',          rhythm: 'knock ... knock',              beats: 'k-k' },
+  { meaning: 'Good night',              rhythm: 'two quick knocks',              beats: 'qq' },
+  { meaning: 'Come and see this',       rhythm: 'three knocks, one long',        beats: 'qqqL' },
+  { meaning: 'I need help',             rhythm: 'five quick knocks',             beats: 'qqqqq' },
+  { meaning: 'The rail is slow tonight', rhythm: 'a slow rhythm of four',        beats: 'k-k-k-k' },
+  { meaning: 'Dinner is ready',         rhythm: 'two quick, a pause, one',       beats: 'qq-k' },
+];
 
+function parseBeats(beats) {
+  let t = 0;
+  const events = [];
+  for (const ch of beats) {
+    if (ch === '-') { t += 0.9; continue; }
+    events.push({ t, dur: ch === 'L' ? 0.4 : 0.12 });
+    t += ch === 'q' ? 0.15 : 0.3;
+  }
+  return { events, total: t };
+}
+
+function setDoorLight(door, on) {
+  if (!door || !door.mat) return;
+  const target = on ? 4.0 : 0.05;
+  if (door.mat.emissiveIntensity !== target) door.mat.emissiveIntensity = target;
+}
+
+function playKnock(distance) {
+  if (!audioCtx || audioCtx.state !== 'running') return;
+  const len = Math.floor(audioCtx.sampleRate * 0.05);
+  const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (len * 0.15));
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const filt = audioCtx.createBiquadFilter();
+  filt.type = 'bandpass';
+  filt.frequency.value = 700;
+  filt.Q.value = 1.2;
+  const gain = audioCtx.createGain();
+  gain.gain.value = Math.min(0.6, 4 / (distance + 2));
+  src.connect(filt);
+  filt.connect(gain);
+  gain.connect(audioCtx.destination);
+  src.start();
+}
+
+function knockSubtitle(pattern, seconds) {
+  const text = heard.has(KNOCK_TOPIC)
+    ? `Knocking: "${pattern.meaning}"`
+    : `Knocking: ${pattern.rhythm}`;
+  knockEl.textContent = text;
+  knockEl.style.display = 'block';
+  knockUntil = performance.now() + Math.max(seconds, 6) * 1000;
+}
+
+// --- Loading -------------------------------------------------------------------
+const loader = new GLTFLoader();
+const modelReady = new Promise((resolve, reject) =>
+  loader.load('spine.glb', gltf => {
+    scene.add(gltf.scene);
+    train = gltf.scene.getObjectByName('Train') || null;
+    resolve(gltf.scene);
+  }, undefined, reject));
+
+const collisionReady = fetch('spine_colliders.json')
+  .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status + ' for spine_colliders.json'); return r.json(); })
+  .then(data => {
+    bounds = data.bounds;
+    colliders = data.colliders;
+    spine = data.spine;
+    pois = data.pois || [];
+    doors = data.doors || [];
+    if (data.train) trainSpec = data.train;
+    trainMin = spine.x0 + 30;
+    trainMax = spine.x1 - 30 - trainSpec.length;
+    trainX = trainMin;
+    return data;
+  });
+
+// Titles come from the first heading of each lore file. Only the title is read here; what
+// the player learns comes from the snippets in snippets.js, said by NPCs.
+const titlesReady = Promise.all(TOPICS.map(file =>
+  fetch('../lore/' + encodeURIComponent(file))
+    .then(r => (r.ok ? r.text() : ''))
+    .then(md => {
+      const line = md.split(/\r?\n/).find(l => l.startsWith('# '));
+      titles[file] = line ? line.replace(/^#\s*/, '').trim() : file;
+    })
+    .catch(() => { titles[file] = file; })));
+
+loadHeard();
+
+// --- NPCs: people walking the Spine, talking, and knocking on doors -------------
 function mulberry32(a) {
   return function () {
     a |= 0; a = a + 0x6D2B79F5 | 0;
@@ -349,42 +481,47 @@ function mulberry32(a) {
 const random = mulberry32(NPC_SEED);
 const pick = arr => arr[Math.floor(random() * arr.length)];
 
+// Each NPC has a role. Their first line is a role line (from the lore file named in "source").
 const NPC_ROLES = [
-  { role: 'Batch clerk', source: 'lore/batch_clerks_message_runners.md',
+  { role: 'Batch clerk', source: 'batch_clerks_message_runners.md',
     line: 'Most people send their messages at shift changes, so the network is busy for a short time and quiet for the rest of the day.' },
-  { role: 'Gait coach', source: 'lore/gait_coaches_balance_instructors.md',
+  { role: 'Gait coach', source: 'gait_coaches_balance_instructors.md',
     line: 'Residents who train with a coach often say they walk differently afterwards. Some say they walk worse on land.' },
-  { role: 'Tailor', source: 'lore/clothing_textiles_and_laundry.md',
+  { role: 'Tailor', source: 'clothing_textiles_and_laundry.md',
     line: 'Tailoring is one of the most common small businesses in the market halls, and it is licensed by the Market Authority.' },
-  { role: 'Chronist', source: 'lore/chronists_ship_clock_keepers.md',
+  { role: 'Chronist', source: 'chronists_ship_clock_keepers.md',
     line: 'We plan the one-hour clock changes as the ship crosses longitudes, spread across the ship so nothing happens all at once.' },
-  { role: 'Warden', source: 'lore/crime_and_justice_in_practice.md',
+  { role: 'Warden', source: 'crime_and_justice_in_practice.md',
     line: 'Most assaults happen during arguments in the terraces, the Spine bars, or the Aft Hall. We separate the people involved first.' },
-  { role: 'Commissary cook', source: 'lore/food_and_agriculture.md',
+  { role: 'Commissary cook', source: 'food_and_agriculture.md',
     line: 'The Commissary runs about 60 kitchens and canteens. Each adult gets a meal allowance credited to their ledger account.' },
-  { role: 'Nurse', source: 'lore/elder_care_and_end_of_life.md',
+  { role: 'Nurse', source: 'elder_care_and_end_of_life.md',
     line: 'The Harbour Care Complex is staffed by about 500 people, including nurses, carers, physiotherapists and social workers.' },
-  { role: 'Teacher', source: 'lore/childhood_and_growing_up_aboard.md',
+  { role: 'Teacher', source: 'childhood_and_growing_up_aboard.md',
     line: 'Children learn maritime studies from age 9. That covers basic navigation, weather and ship systems.' },
-  { role: 'Market trader', source: 'lore/markets_and_commerce.md',
+  { role: 'Market trader', source: 'markets_and_commerce.md',
     line: 'Most payments go through ledger credit cards linked to resident accounts. Cash exists only as small Company tokens.' },
-  { role: 'Sail hand', source: 'lore/crew_culture_and_seafarer_traditions.md',
+  { role: 'Sail hand', source: 'crew_culture_and_seafarer_traditions.md',
     line: 'The Sail Department still sings a few shanties during lowering and raising operations.' },
-  { role: 'Robot technician', source: 'lore/automation_and_robotics.md',
+  { role: 'Robot technician', source: 'automation_and_robotics.md',
     line: 'Delivery robots carry parcels along the Spine walkways and are limited to 6 km/h in crowded areas.' },
-  { role: 'Chaplain', source: 'lore/daily_life_and_routines.md',
+  { role: 'Chaplain', source: 'daily_life_and_routines.md',
     line: 'Religious services are held in multi-faith chapels on several decks.' },
-  { role: 'Librarian', source: 'lore/arts_media_and_entertainment.md',
+  { role: 'Librarian', source: 'arts_media_and_entertainment.md',
     line: 'Books are lent for 21 days, and loans are free. The collection is updated at each port call.' },
-  { role: 'Greenhouse worker', source: 'lore/animals_and_pets_aboard.md',
+  { role: 'Greenhouse worker', source: 'animals_and_pets_aboard.md',
     line: 'The greenhouses use bumblebees to pollinate tomatoes and peppers, because many plants do not pollinate well indoors.' },
 ];
 const NPC_NAMES = ['Amara', 'Tomas', 'Lin', 'Sefa', 'Priya', 'Dmitri', 'Ines', 'Kofi', 'Hana', 'Mateo',
   'Yara', 'Oskar', 'Ada', 'Ravi', 'Noor', 'Felix', 'Mira', 'Jonas', 'Aiko', 'Samuel', 'Lena', 'Idris',
-  'Clara', 'Rafael', 'Esme', 'Kwame', 'Svetla', 'Omar'];
+  'Clara', 'Rafael', 'Esme', 'Kwame', 'Svetla', 'Omar', 'Hugo', 'Leila', 'Bruno', 'Sana',
+  'Teo', 'Nadia', 'Erik', 'Mina', 'Caleb', 'Ruth', 'Jun', 'Imani', 'Pavel', 'Rosa',
+  'Gabe', 'Ayla', 'Wen', 'Ferdi', 'Ingrid', 'Malik', 'Dora', 'Tariq', 'Elin', 'Sol',
+  'Reza', 'Vera', 'Joss', 'Anouk', 'Bashir', 'Lucia'];
 const SHIRT_COLORS = [0x2b5c8a, 0xb5452f, 0x3c7a4a, 0xd9a441, 0x6b4c9a, 0x2f8f8f, 0xc7c7c7, 0x8a3b3b, 0x4d6e3a, 0xe0e0e0];
 const SKIN_COLORS = [0xf1c9a5, 0xd9a77c, 0xa86f4c, 0x7a4a2e];
 const TROUSER_COLORS = [0x2a2f3a, 0x4a4032, 0x35424e];
+const KNOCK_CHANCE = 0.3;
 
 const npcGeom = {
   torso: new THREE.CylinderGeometry(0.2, 0.24, 0.72, 8),
@@ -400,6 +537,23 @@ function randomWalkablePoint() {
     if (!blocked(x, y)) return [x, y];
   }
   return null;
+}
+
+// The knock spot is in front of a door, between the hall face and the aisle.
+function doorStance(door) {
+  return [door.x, door.side === 'port' ? -10.0 : 10.0];
+}
+
+// NPC lines: the role line, then one snippet from each of two assigned topics.
+// Topic i is assigned to NPC i and NPC i+20, so every topic is heard by at least two people.
+function linesFor(index, info) {
+  const first = TOPICS[index % TOPIC_COUNT];
+  const second = TOPICS[(index + 20) % TOPIC_COUNT];
+  return [
+    { text: info.line, topic: info.source },
+    { text: SNIPPETS[first], topic: first },
+    { text: SNIPPETS[second], topic: second },
+  ];
 }
 
 function createNpcs() {
@@ -430,32 +584,95 @@ function createNpcs() {
     scene.add(group);
 
     npcs.push({
-      name: NPC_NAMES[i % NPC_NAMES.length], role: info.role, line: info.line, source: info.source,
+      name: NPC_NAMES[i % NPC_NAMES.length], role: info.role,
+      lines: linesFor(i, info), talkIndex: 0,
       x: spot[0], y: spot[1], tx: spot[0], ty: spot[1],
       speed: 0.9 + random() * 0.7, wait: random() * 3, phase: random() * 6,
+      doorTarget: null, knock: null, faceUntil: 0,
       group, legL, legR,
     });
   }
 }
 
 function pickNpcTarget(n) {
+  if (doors.length && random() < KNOCK_CHANCE) {
+    const door = pick(doors);
+    const [sx, sy] = doorStance(door);
+    if (!blocked(sx, sy)) {
+      n.tx = sx; n.ty = sy; n.doorTarget = door;
+      return;
+    }
+  }
+  n.doorTarget = null;
   const spot = randomWalkablePoint();
   if (spot) { n.tx = spot[0]; n.ty = spot[1]; } else { n.tx = n.x; n.ty = n.y; }
 }
 
+function startKnock(n, door) {
+  const pattern = pick(KNOCK_PATTERNS);
+  const timing = parseBeats(pattern.beats);
+  n.knock = { pattern, ...timing, t: 0, last: -1, door };
+  const dx = camera.position.x - door.x;
+  const dy = -camera.position.z - door.y;
+  if (Math.hypot(dx, dy) < 14) knockSubtitle(pattern, timing.total + 0.6);
+}
+
 function updateNpcs(dt) {
+  const now = performance.now();
+  const camX = camera.position.x, camY = -camera.position.z;
   for (const n of npcs) {
+    // Knocking on a door
+    if (n.knock) {
+      const k = n.knock;
+      k.t += dt;
+      let on = false;
+      for (let i = 0; i < k.events.length; i++) {
+        const e = k.events[i];
+        if (k.t >= e.t && k.t < e.t + e.dur) {
+          on = true;
+          if (k.last !== i) {
+            k.last = i;
+            playKnock(Math.hypot(camX - k.door.x, camY - k.door.y));
+          }
+        }
+      }
+      setDoorLight(k.door, on);
+      const fx = k.door.x - n.x, fy = k.door.y - n.y;
+      n.group.rotation.y = Math.atan2(fx, -fy);
+      n.legL.rotation.x = 0;
+      n.legR.rotation.x = 0;
+      if (k.t >= k.total + 0.4) {
+        setDoorLight(k.door, false);
+        n.knock = null;
+        n.wait = 2 + random() * 3;
+        pickNpcTarget(n);
+      }
+      continue;
+    }
+
+    // Talking: face the player
+    if (n.faceUntil > now) {
+      n.group.rotation.y = Math.atan2(camX - n.x, -(camY - n.y));
+    }
+
     if (n.wait > 0) {
       n.wait -= dt;
       n.legL.rotation.x = 0;
       n.legR.rotation.x = 0;
       continue;
     }
+
     const dx = n.tx - n.x, dy = n.ty - n.y;
     const dist = Math.hypot(dx, dy);
     if (dist < 0.2) {
-      n.wait = 1 + random() * 4;
-      pickNpcTarget(n);
+      if (n.doorTarget) {
+        const door = n.doorTarget;
+        n.doorTarget = null;
+        startKnock(n, door);
+      } else {
+        n.wait = 1 + random() * 4;
+        pickNpcTarget(n);
+      }
       continue;
     }
     const step = Math.min(dist, n.speed * dt);
@@ -478,6 +695,28 @@ function updateNpcs(dt) {
   }
 }
 
+// Talking to an NPC gives the next line; the line's topic is heard.
+function talkTo(n) {
+  const line = n.lines[n.talkIndex % n.lines.length];
+  n.talkIndex++;
+  n.faceUntil = performance.now() + 9000;
+  n.wait = Math.max(n.wait, 9);
+  showDialogue(`${n.name} - ${n.role}`, line.text);
+  hear(line.topic, line.text);
+}
+
+// Door light and knock timing are set up in createNpcs/loading; this runs after the GLB loads.
+function bindDoorLights(root) {
+  for (const d of doors) {
+    const mesh = root.getObjectByName(d.light);
+    if (mesh && mesh.material) {
+      d.mat = mesh.material;
+      d.mat.emissive.set(0xffd88a);
+      d.mat.emissiveIntensity = 0.05;
+    }
+  }
+}
+
 // --- HUD and strip map (top right) -------------------------------------------
 const hud = document.getElementById('hud');
 const mapCanvas = document.getElementById('map');
@@ -488,8 +727,7 @@ const MAP_TRACK_Y = 26;
 function updateHud() {
   const bx = camera.position.x;
   const along = Math.min(Math.max(bx - spine.x0, 0), spine.length).toFixed(0);
-  const total = Object.keys(lore).length;
-  hud.textContent = `The Spine - Halcyon Meridian | ${along} m along the Spine | Lore found ${discovered.size} / ${total}`;
+  hud.textContent = `The Spine - Halcyon Meridian | ${along} m along the Spine | Heard ${heard.size} / ${TOPIC_COUNT}`;
 }
 
 function mapX(x) {
@@ -514,11 +752,6 @@ function drawMap() {
     ctx.arc(mapX(p.x), MAP_TRACK_Y, 3, 0, Math.PI * 2);
     ctx.fill();
   }
-  ctx.fillStyle = '#7fe8ff';
-  for (const t of terminals) {
-    ctx.fillRect(mapX(t.x) - 0.5, MAP_TRACK_Y - 9, 1.5, 4);
-  }
-
   ctx.fillStyle = '#c9d2dc';
   for (const n of npcs) ctx.fillRect(mapX(n.x), MAP_TRACK_Y + 4, 1.5, 3);
 
@@ -540,72 +773,31 @@ function drawMap() {
   ctx.textAlign = 'left';
 }
 
-// --- Load model, collision data and lore --------------------------------------
-const loader = new GLTFLoader();
-const modelReady = new Promise((resolve, reject) =>
-  loader.load('spine.glb', gltf => {
-    scene.add(gltf.scene);
-    train = gltf.scene.getObjectByName('Train') || null;
-    resolve();
-  }, undefined, reject));
+// --- Set up the world once everything has loaded ------------------------------
+Promise.all([modelReady, collisionReady, titlesReady]).then(([root]) => {
+  bindDoorLights(root);
 
-const collisionReady = fetch('spine_colliders.json')
-  .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status + ' for spine_colliders.json'); return r.json(); })
-  .then(data => {
-    bounds = data.bounds;
-    colliders = data.colliders;
-    spine = data.spine;
-    pois = data.pois || [];
-    terminals = data.terminals || [];
-    if (data.train) trainSpec = data.train;
-    trainMin = spine.x0 + 30;
-    trainMax = spine.x1 - 30 - trainSpec.length;
-    trainX = trainMin;
-    return data;
-  });
-
-// Each terminal opens one lore file. Files are read from the lore/ folder next to the repo root.
-const loreReady = collisionReady.then(data => {
-  const files = (data.terminals || []).map(t => t.file);
-  return Promise.all(files.map(file =>
-    fetch('../lore/' + encodeURIComponent(file))
-      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status + ' for ' + file); return r.text(); })
-      .then(md => { lore[file] = parseLore(md, file.replace(/\.md$/, '')); })
-  ));
-});
-
-loadDiscovered();
-
-Promise.all([modelReady, collisionReady, loreReady]).then(() => {
-  // Interactables: points of interest and lore terminals.
+  // Points of interest are signs: the sign's text is said aloud as a notice, and it counts as
+  // hearing its topic.
   for (const p of pois) {
     interactables.push({
       x: p.x, y: p.y, range: POI_RANGE,
-      label: () => p.name,
-      use: () => openReading({ title: p.name, text: p.text, source: p.source }),
-    });
-  }
-  for (const t of terminals) {
-    interactables.push({
-      x: t.x, y: t.y, range: TERMINAL_RANGE,
-      label: () => discovered.has(t.file) ? `Lore: ${lore[t.file].title}` : 'Lore terminal',
+      label: () => `Read sign: ${p.name}`,
       use: () => {
-        const entry = lore[t.file];
-        discover(t.file);
-        openReading({ title: entry.title, text: entry.body, source: 'lore/' + t.file });
+        showDialogue(p.name, p.text, 16);
+        hear(p.source.replace(/^lore\//, ''), p.text);
       },
     });
   }
 
-  // NPCs (after the walkable area is known) and their interactables.
   createNpcs();
   for (const n of npcs) {
     interactables.push({
       get x() { return n.x; },
       get y() { return n.y; },
-      range: 2.2,
+      range: NPC_RANGE,
       label: () => `Talk to ${n.name} (${n.role})`,
-      use: () => openReading({ title: `${n.name} - ${n.role}`, text: n.line, source: n.source }),
+      use: () => talkTo(n),
     });
   }
 
@@ -620,8 +812,9 @@ Promise.all([modelReady, collisionReady, loreReady]).then(() => {
   // Debug parameters (for screenshots):
   //   ?shot=1        hide the start overlay
   //   ?train=600     place the train at X = 600 m and hold it
-  //   ?open=N        open point of interest N
-  //   ?read=N        open lore terminal N (also marks it found)
+  //   ?open=N        show sign N's text
+  //   ?talk=N        stand next to NPC N and talk to them
+  //   ?knock=1       make NPC 0 knock on the first door right away
   //   ?journal=1     open the journal
   if (params.has('shot')) overlay.classList.add('hidden');
   if (params.has('train') && train) {
@@ -630,12 +823,22 @@ Promise.all([modelReady, collisionReady, loreReady]).then(() => {
   }
   if (params.has('open') && pois[parseInt(params.get('open'), 10)]) {
     const p = pois[parseInt(params.get('open'), 10)];
-    openReading({ title: p.name, text: p.text, source: p.source });
+    showDialogue(p.name, p.text, 60);
+    hear(p.source.replace(/^lore\//, ''), p.text);
   }
-  if (params.has('read') && terminals[parseInt(params.get('read'), 10)]) {
-    const t = terminals[parseInt(params.get('read'), 10)];
-    discover(t.file);
-    openReading({ title: lore[t.file].title, text: lore[t.file].body, source: 'lore/' + t.file });
+  if (params.has('talk') && npcs[parseInt(params.get('talk'), 10)]) {
+    const n = npcs[parseInt(params.get('talk'), 10)];
+    camera.position.set(n.x - 3.2, EYE_HEIGHT, -n.y);
+    camera.lookAt(n.x, EYE_HEIGHT, -n.y);
+    talkTo(n);
+  }
+  if (params.has('knock') && npcs[0] && doors[0]) {
+    const [sx, sy] = doorStance(doors[0]);
+    npcs[0].x = sx; npcs[0].y = sy;
+    npcs[0].group.position.set(sx, 0, -sy);
+    npcs[0].wait = 0;
+    npcs[0].doorTarget = null;
+    startKnock(npcs[0], doors[0]);
   }
   if (params.has('journal')) openJournal();
 }).catch(err => {
@@ -652,6 +855,7 @@ function animate(timestamp) {
   updateMovement(dt);
   if (!panelOpen) updateNpcs(dt);
   updateInteraction();
+  updateOverlays();
   updateHud();
   drawMap();
   renderer.render(scene, camera);

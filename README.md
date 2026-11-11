@@ -6,10 +6,10 @@ Worldbuilding notes, a text adventure, 2D/SVG art, and low-poly 3D for the **Hal
 
 | Path | What it is |
 |---|---|
-| `lore/*.md` | Worldbuilding reference (60 files). Start with `lore/halcyon_meridian_general_description.md` and `lore/ship_structure_and_layout.md`. The Spine's lore terminals open these files. |
+| `lore/*.md` | Worldbuilding reference (60 files). Start with `lore/halcyon_meridian_general_description.md` and `lore/ship_structure_and_layout.md`. The Spine's NPCs say lines drawn from these files. |
 | `halcyon_meridian_game.py` | Text adventure (Python 3, stdlib only). Run with `python halcyon_meridian_game.py`. |
 | `halcyon_meridian_exterior.svg`, `halcyon_meridian_spine_interior.svg` | 2D artwork of the ship exterior and the Spine. |
-| `spine/` | Walkable Spine (Deck 9): lore terminals, NPCs, points of interest, a train, and a strip map. Blender build script, GLB, collision data, viewer. |
+| `spine/` | Walkable Spine (Deck 9): NPCs who talk and knock on doors, signs, a train, a journal, and a strip map. Blender build script, GLB, collision data, viewer, and `snippets.js` with the topic lines. |
 | `engine_room/` | Walkable low-poly engine room: Blender build script, GLB, collision data, viewer. |
 | `ship/` | Exterior overview of the whole ship with an orbit camera: Blender build script, GLB, viewer. |
 | `package.json`, `package-lock.json` | Node deps. Only `three` (0.187.0) is used, by the viewers. |
@@ -32,13 +32,18 @@ Run the server from the repo root so `node_modules/three` resolves. Dependencies
 
 Layout: aft tower at X = 0 to 100 m, fore tower at X = 1500 to 1600 m, Spine floor between them (X = 100 to 1500 m, 40 m wide, Z = 0 is the Deck 9 floor). Market halls line both sides, leaving a 22 m clear centre aisle, with awnings, lit fronts, and planters with trees in the gaps. Lamp posts line the aisle. The Spine is 1,400 m here, against about 1.5 km in the lore.
 
-Controls: WASD/arrows to walk, Shift to run, mouse to look, Esc to release. E to interact, J for the journal.
+Controls: WASD/arrows to walk, Shift to run, mouse to look, Esc to release. E to talk or read a sign, J for the journal.
 
-- **Lore terminals (60):** one glowing terminal per lore file, along the aisle. Press E to read the file. Each read marks the entry as found; the HUD and journal show progress. Found entries are saved in the browser (localStorage) for this site.
-- **Points of interest (5):** named places with a short text taken from the lore. Set in `POIS` in `build_spine.py`.
-- **NPCs (60):** walking the Spine, avoiding walls and the train. Each has a role and a line paraphrased from a lore file. Press E near one to talk. The layout is seeded (`?seed=N`).
+Nothing is handed over as a file to read. The lore comes out in the world:
+
+- **NPCs (60):** walking the Spine, avoiding walls and the train. Press E near one to talk. Each NPC says a role line from a lore file, then short lines from two assigned topics, so each topic is said by at least two people. Repeat talks give the next line. The first time you hear a topic, a notice shows its title and the topic is added to the journal with the line you heard. Layout is seeded (`?seed=N`).
+- **Knocks on doors:** every market hall has a door on each side. NPCs sometimes walk to a door and knock one of the six patterns from `lore/knock_codes_and_cabin_talk.md`. The light above the door flashes with each knock and you hear it. A subtitle shows the rhythm. Once you have heard the knock-codes topic, the subtitle also shows what the knock means.
+- **Signs (5):** named places on hall fronts. E reads the sign, which counts as hearing its topic. Set in `POIS` in `build_spine.py`.
+- **Journal (J):** the 60 topics, marked as heard (with the line you heard) or not yet found. The HUD shows how many you have heard. Progress is saved in the browser (localStorage) for this site.
 - **Electric train:** shuttles along the centre track at 25 km/h (the lore's maximum), pausing 6 s at each end. It blocks the aisle; if it reaches you, you are pushed to the side of the track.
-- **Strip map (top right):** the Spine as a bar, with terminals (cyan), points of interest (yellow), NPCs (grey), the train (blue), and your position (white).
+- **Strip map (top right):** the Spine as a bar, with signs (yellow), NPCs (grey), the train (blue), and your position (white).
+
+Topic lines live in `spine/snippets.js`, one per lore file. They are short paraphrases of each file's opening points. Edit that file to change what people say.
 
 Rebuild:
 
@@ -46,13 +51,12 @@ Rebuild:
 & "C:\Program Files\Blender Foundation\Blender 5.3\blender.exe" --background --factory-startup --python "spine\build_spine.py"
 ```
 
-The build script reads the lore folder, so adding or removing lore files changes the number of terminals (the Spine must have room for them: about 22 m per terminal).
-
 URL parameters (for testing and screenshots):
 - `?x=800&y=0&yaw=0`: start position in metres and heading (0 = fore, 90 = port)
 - `?shot=1`: hide the start overlay
-- `?read=N`: open lore terminal N
-- `?open=N`: open point of interest N
+- `?talk=N`: stand next to NPC N and talk to them
+- `?knock=1`: make NPC 0 knock on the first door right away
+- `?open=N`: show sign N's text
 - `?journal=1`: open the journal
 - `?train=600`: place the train at X = 600 m and hold it
 - `?seed=N`: NPC layout seed
@@ -91,8 +95,8 @@ The viewer's start position is in the port aisle at Blender (20, -12).
 
 Done:
 - Blender 5.3 installed and verified headless.
-- Lore moved into `lore/`. The Spine has a terminal for every lore file, a journal, and discovery saved in the browser.
-- NPCs walk the Spine with lore-based lines.
+- Lore moved into `lore/`. Lore is learned through NPC conversations and knocks on doors, not by reading files. A journal tracks what you have heard.
+- NPCs walk the Spine, talk, and knock on doors.
 - Whole-ship exterior overview.
 - Headless screenshots and console checks for each viewer; no console errors.
 
@@ -100,8 +104,10 @@ Not done or not decided:
 - **Game engine/platform is not decided.** Options are a browser game (Three.js or Babylon.js), Godot, or Unity. This determines the next steps.
 - **Art style is not decided.** The models are untextured, flat-shaded blockouts.
 - **Three.js MCP server not configured.** Candidate: `threejs-devtools-mcp` on npm (unverified). Add to `opencode.json` under `"mcp"` if wanted.
-- **Interactions were not played by hand.** Walking, collisions, the train push-out, the E panels, and NPC conversations were checked with headless screenshots and a movement simulation. The lore panels were checked with `?read=N` and `?journal=1`, which use the same code path as E.
+- **Interactions were not played by hand.** Walking, collisions, the train push-out, talking, and knocks were checked with headless screenshots, console logs, and a movement simulation. The E key itself was not pressed in a browser; the same functions run through `?talk=N` and `?knock=1`.
+- The knock meaning and the flashing door light were checked from the code and one screenshot; the flashes are short, so they were not captured on screen.
 - NPCs do not avoid the player, and they do not talk to each other.
+- The lore snippets in `spine/snippets.js` are short paraphrases I wrote from each file's opening points. They have not been checked line by line against the full files.
 - The Spine is 1,400 m and not 1.5 km. Towers are plain boxes.
 - The Spine GLB is about 1.3 MB because each sleeper, tree, and lamp is its own mesh; merging them would reduce this.
 - The reactor citadels are solid cylinders.
