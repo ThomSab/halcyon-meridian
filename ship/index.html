@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Halcyon Meridian - Ship overview</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; }
+  #hud {
+    position: absolute; top: 10px; left: 10px; color: #fff; font-size: 13px; line-height: 1.5;
+    background: rgba(0, 0, 0, 0.5); padding: 8px 12px; border-radius: 4px;
+  }
+  #hud a { color: #ffd66b; }
+  #status { position: absolute; bottom: 12px; left: 12px; color: #fff; font-size: 12px;
+    background: rgba(0, 0, 0, 0.5); padding: 4px 8px; border-radius: 4px; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "../node_modules/three/build/three.module.js",
+    "three/addons/": "../node_modules/three/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="hud">
+  <strong>Halcyon Meridian - ship overview</strong><br>
+  Drag to orbit, scroll to zoom, right-drag to pan.<br>
+  Length 1,600 m, beam 320 m. Blockout, not to scale for details.<br>
+  <a href="../spine/index.html">Walk the Spine</a>
+</div>
+<div id="status">Loading ship...</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xa9c3d6);
+scene.fog = new THREE.Fog(0xa9c3d6, 3500, 14000);
+
+const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 5, 30000);
+
+scene.add(new THREE.HemisphereLight(0xeaf2ff, 0x2a3640, 1.1));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+sun.position.set(-1500, 1200, 800);   // three.js coordinates (Y is up)
+scene.add(sun);
+
+// Ship centre in three.js coordinates: Blender (800, 0, 60) -> three (800, 60, 0)
+const target = new THREE.Vector3(800, 60, 0);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.copy(target);
+controls.enableDamping = true;
+controls.minDistance = 250;
+controls.maxDistance = 9000;
+controls.maxPolarAngle = Math.PI * 0.49;   // stay above the sea
+camera.position.set(800 + 1100, 700, 1500);
+controls.update();
+
+const status = document.getElementById('status');
+new GLTFLoader().load('ship.glb', gltf => {
+  scene.add(gltf.scene);
+  status.textContent = 'Ship loaded.';
+}, undefined, err => {
+  status.textContent = 'Failed to load ship.glb: ' + err;
+});
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>
