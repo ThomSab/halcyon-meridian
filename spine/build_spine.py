@@ -202,14 +202,27 @@ for poi in POIS:
                         "x": cx, "y": y})
 
 # Planters with trees in the gaps between halls
+# Lifts sit in two of the gaps between halls (gap k is centred at x = 170 + 60k).
+# Gap 10 (x = 770, port) and gap 18 (x = 1250, starboard) become lift shafts instead of planters.
+LIFT_GAPS = {10: ("Port", -15.0), 18: ("Stbd", 15.0)}
+lifts = []
 planter_index = 0
 gap_x = SPINE_X0 + 20.0 + HALL_LEN
 while gap_x + HALL_GAP <= SPINE_X1 - 20.0 + 0.1:
     cx = gap_x + HALL_GAP / 2
-    for side, y in (("Port", -15.0), ("Stbd", 15.0)):
-        box(f"Planter_{side}_{planter_index}", cx - 1.5, cx + 1.5, y - 1.0, y + 1.0, 0, 1.0,
-            MAT["planter"], collide=True)
-        ball(f"Tree_{side}_{planter_index}", cx, y, 2.3, 1.3, MAT["foliage"])
+    if planter_index in LIFT_GAPS:
+        side, y = LIFT_GAPS[planter_index]
+        sign = -1.0 if y < 0 else 1.0
+        box(f"Lift_{side}_{planter_index}", cx - 2.0, cx + 2.0, y - 4.0, y + 4.0, 0, 4.2, MAT["pole"], collide=True)
+        # Lift doors face the aisle; a glowing panel shows the lift is in use
+        box(f"LiftDoor_{side}_{planter_index}", cx - 1.6, cx + 1.6, -11.12 if sign < 0 else 10.9,
+            -10.9 if sign < 0 else 11.12, 0.4, 3.6, MAT["poi"])
+        lifts.append({"name": f"Lift {side}", "x": cx, "y": y, "stance": [cx, -9.0 if sign < 0 else 9.0]})
+    else:
+        for side, y in (("Port", -15.0), ("Stbd", 15.0)):
+            box(f"Planter_{side}_{planter_index}", cx - 1.5, cx + 1.5, y - 1.0, y + 1.0, 0, 1.0,
+                MAT["planter"], collide=True)
+            ball(f"Tree_{side}_{planter_index}", cx, y, 2.3, 1.3, MAT["foliage"])
     planter_index += 1
     gap_x += HALL_LEN + HALL_GAP
 
@@ -275,6 +288,7 @@ with open(json_path, "w") as f:
         "spine": {"x0": SPINE_X0, "x1": SPINE_X1, "length": SPINE_X1 - SPINE_X0},
         "pois": poi_records,
         "doors": door_records,
+        "lifts": lifts,
         "train": {"length": TRAIN_LENGTH, "half_width": 1.5, "speed": 6.94},
         "colliders": colliders,
     }, f, indent=2)

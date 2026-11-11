@@ -1,0 +1,990 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Halcyon Meridian - Ship</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; }
+  #overlay {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(0, 0, 0, 0.55); color: #fff; cursor: pointer; text-align: center; z-index: 10;
+  }
+  #overlay.hidden { display: none; }
+  #overlay div { background: rgba(0, 0, 0, 0.6); padding: 16px 24px; border-radius: 6px; line-height: 1.6; }
+  #hud {
+    position: absolute; top: 10px; left: 10px; color: #fff; font-size: 13px;
+    background: rgba(0, 0, 0, 0.5); padding: 6px 10px; border-radius: 4px; pointer-events: none;
+  }
+  #map {
+    position: absolute; top: 10px; right: 10px; background: rgba(0, 0, 0, 0.5);
+    border-radius: 4px; pointer-events: none;
+  }
+  #notice {
+    position: absolute; top: 56px; left: 50%; transform: translateX(-50%); color: #fff;
+    font-size: 14px; background: rgba(0, 0, 0, 0.7); padding: 6px 12px; border-radius: 4px;
+    pointer-events: none; display: none; white-space: nowrap;
+  }
+  #notice.gold { color: #ffd66b; }
+  #knock {
+    position: absolute; top: 96px; left: 50%; transform: translateX(-50%); color: #cfe9ff;
+    font-size: 13px; font-style: italic; background: rgba(0, 0, 0, 0.5); padding: 4px 10px;
+    border-radius: 4px; pointer-events: none; display: none; white-space: nowrap;
+  }
+  #prompt {
+    position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); color: #fff;
+    font-size: 15px; background: rgba(0, 0, 0, 0.6); padding: 6px 12px; border-radius: 4px;
+    pointer-events: none; display: none;
+  }
+  #dialogue {
+    position: absolute; bottom: 64px; left: 50%; transform: translateX(-50%);
+    width: min(720px, 92vw); box-sizing: border-box; color: #fff; background: rgba(12, 14, 18, 0.85);
+    padding: 10px 14px; border-radius: 6px; pointer-events: none; display: none; line-height: 1.45;
+  }
+  #dialogue .who { color: #ffd66b; font-weight: bold; font-size: 14px; }
+  #dialogue .text { font-size: 15px; margin-top: 4px; }
+  #dialogue .hint { color: #9aa; font-size: 11px; margin-top: 6px; }
+  #panel {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: min(780px, 92vw); max-height: 84vh; box-sizing: border-box; display: none;
+    flex-direction: column; background: rgba(12, 14, 18, 0.95); color: #eee;
+    padding: 14px 18px; border-radius: 8px; z-index: 6;
+  }
+  #panel .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  #panel h3 { margin: 0 0 8px 0; font-size: 17px; color: #ffd66b; }
+  #panel button { cursor: pointer; padding: 6px 12px; font-size: 13px; }
+  #ptext {
+    overflow: auto; white-space: pre-wrap; font-size: 13px; line-height: 1.5;
+    flex: 1; min-height: 0; padding-right: 6px;
+  }
+  #ptext .choice { display: block; width: 100%; text-align: left; margin: 4px 0; }
+  #fade {
+    position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none;
+    transition: opacity 0.3s; z-index: 8;
+  }
+  #fade.on { opacity: 1; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "../node_modules/three/build/three.module.js",
+    "three/addons/": "../node_modules/three/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="overlay"><div>Click to start<br><small>WASD / arrows to walk, Shift to run, mouse to look, Esc to release<br>E to talk, use doors and lifts. J for the journal.</small></div></div>
+<div id="hud">Halcyon Meridian</div>
+<canvas id="map" width="360" height="56"></canvas>
+<div id="notice"></div>
+<div id="knock"></div>
+<div id="prompt"></div>
+<div id="dialogue"><div class="who"></div><div class="text"></div><div class="hint">E to continue</div></div>
+<div id="panel">
+  <div class="top"><h3 id="ptitle"></h3><button id="pclose">Close</button></div>
+  <div id="ptext"></div>
+</div>
+<div id="fade"></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+import { SNIPPETS } from '../spine/snippets.js';
+
+const PLAYER_RADIUS = 0.35;
+const EYE_HEIGHT = 1.7;
+const WALK_SPEED = 3.0;
+const RUN_SPEED = 6.0;
+const HEARD_KEY = 'halcyon-lore-heard';
+const NPC_COUNT = 60;
+const NPC_SEED = parseInt(new URLSearchParams(location.search).get('seed') || '1', 10);
+const TOPICS = Object.keys(SNIPPETS).sort();
+const TOPIC_COUNT = TOPICS.length;
+
+// --- Renderer, scene, camera --------------------------------------------------
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9fb4c7);
+scene.fog = new THREE.Fog(0x9fb4c7, 300, 900);
+
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.05, 4000);
+
+scene.add(new THREE.HemisphereLight(0xe8f0ff, 0x3a3a3a, 1.2));
+const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+sun.position.set(-200, 400, 100);
+scene.add(sun);
+
+// --- Controls and overlay -----------------------------------------------------
+const controls = new PointerLockControls(camera, renderer.domElement);
+const overlay = document.getElementById('overlay');
+const fadeEl = document.getElementById('fade');
+let panelOpen = false;
+
+let audioCtx = null;
+function ensureAudio() {
+  if (audioCtx) return;
+  try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioCtx = null; }
+}
+
+overlay.addEventListener('click', () => controls.lock());
+controls.addEventListener('lock', () => { overlay.classList.add('hidden'); ensureAudio(); });
+controls.addEventListener('unlock', () => { if (!panelOpen) overlay.classList.remove('hidden'); });
+
+const keys = {};
+document.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.repeat) return;
+  if (e.code === 'KeyE') useNearest();
+  if (e.code === 'KeyJ') toggleJournal();
+});
+document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+// --- Zones -------------------------------------------------------------------
+// Every zone has world-space bounds and colliders. The player only collides with the active zone.
+const zones = {};        // id -> zone
+let spineZone = null;
+let activeZone = null;
+let spine = { x0: 100, x1: 1500, length: 1400 };
+let spineDoors = [];     // hall doors on the Spine
+let spineLifts = [];
+let pois = [];
+let train = null;
+let trainSpec = { length: 69, half_width: 1.5, speed: 6.94 };
+let trainMin = 130, trainMax = 1400, trainX = 130, trainDir = 1, trainPause = 0;
+const TRAIN_PAUSE_SECONDS = 6;
+
+function trainBox(margin) {
+  return { x0: trainX - margin, x1: trainX + trainSpec.length + margin, hw: trainSpec.half_width + margin };
+}
+
+function updateTrain(dt) {
+  if (!train) return;
+  if (trainPause > 0) {
+    trainPause -= dt;
+  } else {
+    trainX += trainDir * trainSpec.speed * dt;
+    if (trainX >= trainMax) { trainX = trainMax; trainDir = -1; trainPause = TRAIN_PAUSE_SECONDS; }
+    if (trainX <= trainMin) { trainX = trainMin; trainDir = 1; trainPause = TRAIN_PAUSE_SECONDS; }
+  }
+  train.position.x = trainX;
+}
+
+function blockedIn(zone, bx, by) {
+  const b = zone.bounds;
+  if (bx < b.min[0] + PLAYER_RADIUS || bx > b.max[0] - PLAYER_RADIUS) return true;
+  if (by < b.min[1] + PLAYER_RADIUS || by > b.max[1] - PLAYER_RADIUS) return true;
+  if (zone.isSpine && train) {
+    const tb = trainBox(PLAYER_RADIUS);
+    if (bx > tb.x0 && bx < tb.x1 && Math.abs(by) < tb.hw) return true;
+  }
+  for (const c of zone.colliders) {
+    if (c.type === 'box') {
+      if (bx > c.min[0] - PLAYER_RADIUS && bx < c.max[0] + PLAYER_RADIUS &&
+          by > c.min[1] - PLAYER_RADIUS && by < c.max[1] + PLAYER_RADIUS) return true;
+    } else if (c.type === 'circle') {
+      const dx = bx - c.center[0], dy = by - c.center[1];
+      const r = c.radius + PLAYER_RADIUS;
+      if (dx * dx + dy * dy < r * r) return true;
+    }
+  }
+  return false;
+}
+
+// --- Movement with wall sliding ----------------------------------------------
+const forward = new THREE.Vector3();
+const right = new THREE.Vector3();
+const UP = new THREE.Vector3(0, 1, 0);
+
+function updateMovement(dt) {
+  if (!controls.isLocked || !activeZone || travelling) return;
+
+  if (activeZone.isSpine && train) {
+    const tb = trainBox(PLAYER_RADIUS);
+    const px = camera.position.x, py = -camera.position.z;
+    if (px > tb.x0 && px < tb.x1 && Math.abs(py) < tb.hw) {
+      camera.position.z = -((py >= 0 ? 1 : -1) * tb.hw);
+    }
+  }
+
+  camera.getWorldDirection(forward);
+  forward.y = 0;
+  forward.normalize();
+  right.crossVectors(forward, UP).normalize();
+
+  let f = 0, r = 0;
+  if (keys['KeyW'] || keys['ArrowUp']) f += 1;
+  if (keys['KeyS'] || keys['ArrowDown']) f -= 1;
+  if (keys['KeyD'] || keys['ArrowRight']) r += 1;
+  if (keys['KeyA'] || keys['ArrowLeft']) r -= 1;
+  if (f === 0 && r === 0) return;
+
+  const speed = (keys['ShiftLeft'] || keys['ShiftRight'] ? RUN_SPEED : WALK_SPEED) * dt;
+  const dx = forward.x * f + right.x * r;
+  const dz = forward.z * f + right.z * r;
+  const len = Math.hypot(dx, dz);
+  const mx = (dx / len) * speed;
+  const my = -(dz / len) * speed;   // Blender y runs opposite to three.js z
+
+  const bx = camera.position.x;
+  const by = -camera.position.z;
+  const zone = activeZone;
+
+  let nx = bx, ny = by;
+  if (!blockedIn(zone, bx + mx, by + my)) {
+    nx = bx + mx; ny = by + my;
+  } else if (!blockedIn(zone, bx + mx, by)) {
+    nx = bx + mx;
+  } else if (!blockedIn(zone, bx, by + my)) {
+    ny = by + my;
+  }
+  camera.position.x = nx;
+  camera.position.z = -ny;
+}
+
+// Move the player to another zone, with a short fade. Spawn coordinates are world coordinates.
+let travelling = false;
+function travel(zoneId, [x, y]) {
+  if (travelling) return;
+  travelling = true;
+  fadeEl.classList.add('on');
+  setTimeout(() => {
+    activeZone = zones[zoneId];
+    camera.position.set(x, EYE_HEIGHT, -y);
+    nearest = null;
+    if (activeZone.isSpine) notice(`Back on the Spine`, 3);
+    else notice(activeZone.name, 3, true);
+    setTimeout(() => { fadeEl.classList.remove('on'); travelling = false; }, 250);
+  }, 300);
+}
+
+// --- Lore: topics, discovery, journal ----------------------------------------
+let heard = new Set();
+let heardText = {};
+let titles = {};
+
+function loadHeard() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(HEARD_KEY) || '{}');
+    heardText = saved && !Array.isArray(saved) ? saved : {};
+  } catch (e) {
+    heardText = {};
+  }
+  heard = new Set(Object.keys(heardText));
+}
+
+function saveHeard() {
+  try { localStorage.setItem(HEARD_KEY, JSON.stringify(heardText)); } catch (e) { /* storage unavailable */ }
+}
+
+function titleOf(file) {
+  return titles[file] || file.replace(/\.md$/, '').replace(/_/g, ' ');
+}
+
+function hear(file, line) {
+  if (heard.has(file)) return false;
+  heard.add(file);
+  heardText[file] = line || SNIPPETS[file];
+  saveHeard();
+  notice(`Learned: ${titleOf(file)}`, 4, true);
+  return true;
+}
+
+// --- Notices, dialogue, knock subtitles ---------------------------------------
+const noticeEl = document.getElementById('notice');
+const knockEl = document.getElementById('knock');
+const dialogueEl = document.getElementById('dialogue');
+const dialogueWho = dialogueEl.querySelector('.who');
+const dialogueText = dialogueEl.querySelector('.text');
+let noticeUntil = 0, knockUntil = 0, dialogueUntil = 0;
+
+function notice(text, seconds = 3, gold = false) {
+  noticeEl.textContent = text;
+  noticeEl.classList.toggle('gold', !!gold);
+  noticeEl.style.display = 'block';
+  noticeUntil = performance.now() + seconds * 1000;
+}
+
+function showDialogue(who, text, seconds = 20) {
+  dialogueWho.textContent = who;
+  dialogueText.textContent = text;
+  dialogueEl.style.display = 'block';
+  dialogueUntil = performance.now() + seconds * 1000;
+}
+
+function updateOverlays() {
+  const now = performance.now();
+  if (now > noticeUntil) noticeEl.style.display = 'none';
+  if (now > knockUntil) knockEl.style.display = 'none';
+  if (now > dialogueUntil) dialogueEl.style.display = 'none';
+}
+
+// --- Panel: journal and lift menu -----------------------------------------------
+const panel = document.getElementById('panel');
+const panelTitle = document.getElementById('ptitle');
+const panelText = document.getElementById('ptext');
+const panelClose = document.getElementById('pclose');
+
+function openPanel(title) {
+  panelOpen = true;
+  panelTitle.textContent = title;
+  panelText.textContent = '';
+  panel.style.display = 'flex';
+  panelText.scrollTop = 0;
+  overlay.classList.add('hidden');
+  controls.unlock();
+}
+
+function closePanel() {
+  panelOpen = false;
+  panel.style.display = 'none';
+  controls.lock();
+}
+
+panelClose.addEventListener('click', closePanel);
+
+function openJournal() {
+  openPanel(`Journal: ${heard.size} / ${TOPIC_COUNT} heard`);
+  const lines = TOPICS.map(file => heard.has(file)
+    ? `[x] ${titleOf(file)}\n      "${heardText[file]}"`
+    : '[ ] ???');
+  panelText.textContent =
+    'Talk to people on the Spine (E). They will tell you things, and each new topic is added here.\n' +
+    'Some of the ship\'s customs are only shared through knocks on the doors.\n\n' +
+    lines.join('\n\n');
+}
+
+function openLiftMenu() {
+  openPanel('Lift - choose a level');
+  panelText.textContent = '';
+  for (const z of Object.values(zones)) {
+    if (!z.lift) continue;
+    const b = document.createElement('button');
+    b.className = 'choice';
+    b.textContent = z.name;
+    b.addEventListener('click', () => {
+      closePanel();
+      travel(z.id, z.spawn);
+    });
+    panelText.appendChild(b);
+  }
+}
+
+function toggleJournal() {
+  if (panelOpen) { closePanel(); return; }
+  openJournal();
+}
+
+// --- Interaction: nearest interactable, prompt --------------------------------
+const POI_RANGE = 5.0;
+const NPC_RANGE = 2.2;
+const promptEl = document.getElementById('prompt');
+let nearest = null;
+
+function useNearest() {
+  if (panelOpen) { closePanel(); return; }
+  if (nearest) nearest.use();
+}
+
+function updateInteraction() {
+  if (!activeZone || travelling) { nearest = null; promptEl.style.display = 'none'; return; }
+  const bx = camera.position.x;
+  const by = -camera.position.z;
+  let best = null, bestRatio = Infinity;
+  for (const it of activeZone.interactables) {
+    const d = Math.hypot(it.x - bx, it.y - by);
+    if (d <= it.range && d / it.range < bestRatio) { bestRatio = d / it.range; best = it; }
+  }
+  nearest = best;
+  if (nearest && !panelOpen) {
+    promptEl.textContent = `[E] ${nearest.label()}`;
+    promptEl.style.display = 'block';
+  } else {
+    promptEl.style.display = 'none';
+  }
+}
+
+// --- Knock codes (Spine doors) ---------------------------------------------------
+const KNOCK_TOPIC = 'knock_codes_and_cabin_talk.md';
+const KNOCK_PATTERNS = [
+  { meaning: 'Are you awake?',           rhythm: 'knock ... knock',         beats: 'k-k' },
+  { meaning: 'Good night',               rhythm: 'two quick knocks',         beats: 'qq' },
+  { meaning: 'Come and see this',        rhythm: 'three knocks, one long',   beats: 'qqqL' },
+  { meaning: 'I need help',              rhythm: 'five quick knocks',        beats: 'qqqqq' },
+  { meaning: 'The rail is slow tonight', rhythm: 'a slow rhythm of four',    beats: 'k-k-k-k' },
+  { meaning: 'Dinner is ready',          rhythm: 'two quick, a pause, one',  beats: 'qq-k' },
+];
+
+function parseBeats(beats) {
+  let t = 0;
+  const events = [];
+  for (const ch of beats) {
+    if (ch === '-') { t += 0.9; continue; }
+    events.push({ t, dur: ch === 'L' ? 0.4 : 0.12 });
+    t += ch === 'q' ? 0.15 : 0.3;
+  }
+  return { events, total: t };
+}
+
+function setDoorLight(door, on) {
+  if (!door || !door.mat) return;
+  const target = on ? 4.0 : 0.05;
+  if (door.mat.emissiveIntensity !== target) door.mat.emissiveIntensity = target;
+}
+
+function playKnock(distance) {
+  if (!audioCtx || audioCtx.state !== 'running') return;
+  const len = Math.floor(audioCtx.sampleRate * 0.05);
+  const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (len * 0.15));
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const filt = audioCtx.createBiquadFilter();
+  filt.type = 'bandpass';
+  filt.frequency.value = 700;
+  filt.Q.value = 1.2;
+  const gain = audioCtx.createGain();
+  gain.gain.value = Math.min(0.6, 4 / (distance + 2));
+  src.connect(filt);
+  filt.connect(gain);
+  gain.connect(audioCtx.destination);
+  src.start();
+}
+
+function knockSubtitle(pattern, seconds) {
+  knockEl.textContent = heard.has(KNOCK_TOPIC)
+    ? `Knocking: "${pattern.meaning}"`
+    : `Knocking: ${pattern.rhythm}`;
+  knockEl.style.display = 'block';
+  knockUntil = performance.now() + Math.max(seconds, 6) * 1000;
+}
+
+// --- Loading -------------------------------------------------------------------
+const loader = new GLTFLoader();
+function loadGlb(url) {
+  return new Promise((resolve, reject) => loader.load(url, gltf => resolve(gltf), undefined, reject));
+}
+
+const spineDataReady = fetch('../spine/spine_colliders.json')
+  .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status + ' for spine_colliders.json'); return r.json(); });
+const zonesDataReady = fetch('zones.json')
+  .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status + ' for zones.json'); return r.json(); });
+
+const titlesReady = Promise.all(TOPICS.map(file =>
+  fetch('../lore/' + encodeURIComponent(file))
+    .then(r => (r.ok ? r.text() : ''))
+    .then(md => {
+      const line = md.split(/\r?\n/).find(l => l.startsWith('# '));
+      titles[file] = line ? line.replace(/^#\s*/, '').trim() : file;
+    })
+    .catch(() => { titles[file] = file; })));
+
+loadHeard();
+
+// --- NPCs: people walking the Spine, talking, and knocking on doors -------------
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const random = mulberry32(NPC_SEED);
+const pick = arr => arr[Math.floor(random() * arr.length)];
+
+const NPC_ROLES = [
+  { role: 'Batch clerk', source: 'batch_clerks_message_runners.md',
+    line: 'Most people send their messages at shift changes, so the network is busy for a short time and quiet for the rest of the day.' },
+  { role: 'Gait coach', source: 'gait_coaches_balance_instructors.md',
+    line: 'Residents who train with a coach often say they walk differently afterwards. Some say they walk worse on land.' },
+  { role: 'Tailor', source: 'clothing_textiles_and_laundry.md',
+    line: 'Tailoring is one of the most common small businesses in the market halls, and it is licensed by the Market Authority.' },
+  { role: 'Chronist', source: 'chronists_ship_clock_keepers.md',
+    line: 'We plan the one-hour clock changes as the ship crosses longitudes, spread across the ship so nothing happens all at once.' },
+  { role: 'Warden', source: 'crime_and_justice_in_practice.md',
+    line: 'Most assaults happen during arguments in the terraces, the Spine bars, or the Aft Hall. We separate the people involved first.' },
+  { role: 'Commissary cook', source: 'food_and_agriculture.md',
+    line: 'The Commissary runs about 60 kitchens and canteens. Each adult gets a meal allowance credited to their ledger account.' },
+  { role: 'Nurse', source: 'elder_care_and_end_of_life.md',
+    line: 'The Harbour Care Complex is staffed by about 500 people, including nurses, carers, physiotherapists and social workers.' },
+  { role: 'Teacher', source: 'childhood_and_growing_up_aboard.md',
+    line: 'Children learn maritime studies from age 9. That covers basic navigation, weather and ship systems.' },
+  { role: 'Market trader', source: 'markets_and_commerce.md',
+    line: 'Most payments go through ledger credit cards linked to resident accounts. Cash exists only as small Company tokens.' },
+  { role: 'Sail hand', source: 'crew_culture_and_seafarer_traditions.md',
+    line: 'The Sail Department still sings a few shanties during lowering and raising operations.' },
+  { role: 'Robot technician', source: 'automation_and_robotics.md',
+    line: 'Delivery robots carry parcels along the Spine walkways and are limited to 6 km/h in crowded areas.' },
+  { role: 'Chaplain', source: 'daily_life_and_routines.md',
+    line: 'Religious services are held in multi-faith chapels on several decks.' },
+  { role: 'Librarian', source: 'arts_media_and_entertainment.md',
+    line: 'Books are lent for 21 days, and loans are free. The collection is updated at each port call.' },
+  { role: 'Greenhouse worker', source: 'animals_and_pets_aboard.md',
+    line: 'The greenhouses use bumblebees to pollinate tomatoes and peppers, because many plants do not pollinate well indoors.' },
+];
+const NPC_NAMES = ['Amara', 'Tomas', 'Lin', 'Sefa', 'Priya', 'Dmitri', 'Ines', 'Kofi', 'Hana', 'Mateo',
+  'Yara', 'Oskar', 'Ada', 'Ravi', 'Noor', 'Felix', 'Mira', 'Jonas', 'Aiko', 'Samuel', 'Lena', 'Idris',
+  'Clara', 'Rafael', 'Esme', 'Kwame', 'Svetla', 'Omar', 'Hugo', 'Leila', 'Bruno', 'Sana',
+  'Teo', 'Nadia', 'Erik', 'Mina', 'Caleb', 'Ruth', 'Jun', 'Imani', 'Pavel', 'Rosa',
+  'Gabe', 'Ayla', 'Wen', 'Ferdi', 'Ingrid', 'Malik', 'Dora', 'Tariq', 'Elin', 'Sol',
+  'Reza', 'Vera', 'Joss', 'Anouk', 'Bashir', 'Lucia'];
+const SHIRT_COLORS = [0x2b5c8a, 0xb5452f, 0x3c7a4a, 0xd9a441, 0x6b4c9a, 0x2f8f8f, 0xc7c7c7, 0x8a3b3b, 0x4d6e3a, 0xe0e0e0];
+const SKIN_COLORS = [0xf1c9a5, 0xd9a77c, 0xa86f4c, 0x7a4a2e];
+const TROUSER_COLORS = [0x2a2f3a, 0x4a4032, 0x35424e];
+const KNOCK_CHANCE = 0.3;
+
+const npcGeom = {
+  torso: new THREE.CylinderGeometry(0.2, 0.24, 0.72, 8),
+  head: new THREE.SphereGeometry(0.13, 10, 8),
+  leg: new THREE.BoxGeometry(0.14, 0.8, 0.16),
+};
+let npcs = [];
+
+function randomWalkablePoint() {
+  for (let i = 0; i < 60; i++) {
+    const x = spine.x0 + 15 + random() * (spine.length - 30);
+    const y = (random() * 2 - 1) * 18;
+    if (!blockedIn(spineZone, x, y)) return [x, y];
+  }
+  return null;
+}
+
+function doorStance(door) {
+  return [door.x, door.side === 'port' ? -9.0 : 9.0];
+}
+
+// NPC lines: the role line, then one snippet from each of two assigned topics.
+function linesFor(index, info) {
+  const first = TOPICS[index % TOPIC_COUNT];
+  const second = TOPICS[(index + 20) % TOPIC_COUNT];
+  return [
+    { text: info.line, topic: info.source },
+    { text: SNIPPETS[first], topic: first },
+    { text: SNIPPETS[second], topic: second },
+  ];
+}
+
+function createNpcs() {
+  npcs = [];
+  for (let i = 0; i < NPC_COUNT; i++) {
+    const spot = randomWalkablePoint();
+    if (!spot) continue;
+    const info = NPC_ROLES[i % NPC_ROLES.length];
+    const group = new THREE.Group();
+    const shirt = new THREE.MeshStandardMaterial({ color: pick(SHIRT_COLORS), roughness: 0.8 });
+    const trousers = new THREE.MeshStandardMaterial({ color: pick(TROUSER_COLORS), roughness: 0.9 });
+    const skin = new THREE.MeshStandardMaterial({ color: pick(SKIN_COLORS), roughness: 0.7 });
+
+    const torso = new THREE.Mesh(npcGeom.torso, shirt);
+    torso.position.y = 1.2;
+    const head = new THREE.Mesh(npcGeom.head, skin);
+    head.position.y = 1.68;
+    const legL = new THREE.Group(), legR = new THREE.Group();
+    legL.position.set(-0.1, 0.8, 0);
+    legR.position.set(0.1, 0.8, 0);
+    const legMeshL = new THREE.Mesh(npcGeom.leg, trousers);
+    legMeshL.position.y = -0.4;
+    const legMeshR = legMeshL.clone();
+    legL.add(legMeshL);
+    legR.add(legMeshR);
+    group.add(torso, head, legL, legR);
+    group.position.set(spot[0], 0, -spot[1]);
+    scene.add(group);
+
+    npcs.push({
+      name: NPC_NAMES[i % NPC_NAMES.length], role: info.role,
+      lines: linesFor(i, info), talkIndex: 0,
+      x: spot[0], y: spot[1], tx: spot[0], ty: spot[1],
+      speed: 0.9 + random() * 0.7, wait: random() * 3, phase: random() * 6,
+      doorTarget: null, knock: null, faceUntil: 0,
+      group, legL, legR,
+    });
+  }
+}
+
+function pickNpcTarget(n) {
+  if (spineDoors.length && random() < KNOCK_CHANCE) {
+    const door = pick(spineDoors);
+    const [sx, sy] = doorStance(door);
+    if (!blockedIn(spineZone, sx, sy)) {
+      n.tx = sx; n.ty = sy; n.doorTarget = door;
+      return;
+    }
+  }
+  n.doorTarget = null;
+  const spot = randomWalkablePoint();
+  if (spot) { n.tx = spot[0]; n.ty = spot[1]; } else { n.tx = n.x; n.ty = n.y; }
+}
+
+function startKnock(n, door) {
+  const pattern = pick(KNOCK_PATTERNS);
+  const timing = parseBeats(pattern.beats);
+  n.knock = { pattern, ...timing, t: 0, last: -1, door };
+  if (activeZone && activeZone.isSpine) {
+    const dx = camera.position.x - door.x;
+    const dy = -camera.position.z - door.y;
+    if (Math.hypot(dx, dy) < 14) knockSubtitle(pattern, timing.total + 0.6);
+  }
+}
+
+function updateNpcs(dt) {
+  const now = performance.now();
+  const camX = camera.position.x, camY = -camera.position.z;
+  for (const n of npcs) {
+    if (n.knock) {
+      const k = n.knock;
+      k.t += dt;
+      let on = false;
+      for (let i = 0; i < k.events.length; i++) {
+        const e = k.events[i];
+        if (k.t >= e.t && k.t < e.t + e.dur) {
+          on = true;
+          if (k.last !== i) {
+            k.last = i;
+            playKnock(Math.hypot(camX - k.door.x, camY - k.door.y));
+          }
+        }
+      }
+      setDoorLight(k.door, on);
+      const fx = k.door.x - n.x, fy = k.door.y - n.y;
+      n.group.rotation.y = Math.atan2(fx, -fy);
+      n.legL.rotation.x = 0;
+      n.legR.rotation.x = 0;
+      if (k.t >= k.total + 0.4) {
+        setDoorLight(k.door, false);
+        n.knock = null;
+        n.wait = 2 + random() * 3;
+        pickNpcTarget(n);
+      }
+      continue;
+    }
+
+    if (n.faceUntil > now) {
+      n.group.rotation.y = Math.atan2(camX - n.x, -(camY - n.y));
+    }
+
+    if (n.wait > 0) {
+      n.wait -= dt;
+      n.legL.rotation.x = 0;
+      n.legR.rotation.x = 0;
+      continue;
+    }
+
+    const dx = n.tx - n.x, dy = n.ty - n.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 0.2) {
+      if (n.doorTarget) {
+        const door = n.doorTarget;
+        n.doorTarget = null;
+        startKnock(n, door);
+      } else {
+        n.wait = 1 + random() * 4;
+        pickNpcTarget(n);
+      }
+      continue;
+    }
+    const step = Math.min(dist, n.speed * dt);
+    const mx = dx / dist * step, my = dy / dist * step;
+    let moved = false;
+    if (!blockedIn(spineZone, n.x + mx, n.y + my)) { n.x += mx; n.y += my; moved = true; }
+    else if (!blockedIn(spineZone, n.x + mx, n.y)) { n.x += mx; moved = true; }
+    else if (!blockedIn(spineZone, n.x, n.y + my)) { n.y += my; moved = true; }
+    if (!moved) {
+      n.wait = 0.5;
+      pickNpcTarget(n);
+      continue;
+    }
+    n.group.position.set(n.x, 0, -n.y);
+    n.group.rotation.y = Math.atan2(mx, -my);
+    n.phase += dt * 8;
+    n.legL.rotation.x = Math.sin(n.phase) * 0.5;
+    n.legR.rotation.x = -Math.sin(n.phase) * 0.5;
+  }
+}
+
+function talkTo(n) {
+  const line = n.lines[n.talkIndex % n.lines.length];
+  n.talkIndex++;
+  n.faceUntil = performance.now() + 9000;
+  n.wait = Math.max(n.wait, 9);
+  showDialogue(`${n.name} - ${n.role}`, line.text);
+  hear(line.topic, line.text);
+}
+
+function bindDoorLights(root) {
+  for (const d of spineDoors) {
+    const mesh = root.getObjectByName(d.light);
+    if (mesh && mesh.material) {
+      d.mat = mesh.material;
+      d.mat.emissive.set(0xffd88a);
+      d.mat.emissiveIntensity = 0.05;
+    }
+  }
+}
+
+// --- Exits and entrances --------------------------------------------------------
+// Returns the Spine spawn point for an exit target such as "hall:16" or "lift:Port".
+function spineSpawnFor(target, fromZone) {
+  if (target.startsWith('hall:')) {
+    const k = parseInt(target.split(':')[1], 10);
+    const door = spineDoors.find(d => d.name === `Door_${fromZone.side}_${k}`);
+    if (door) return doorStance(door);
+  }
+  if (target.startsWith('lift:')) {
+    const key = target.split(':')[1];
+    const lift = spineLifts.find(l => l.name.includes(key)) || spineLifts[0];
+    if (lift) return lift.stance;
+  }
+  return [spine.x0 + 20, 0];
+}
+
+// --- Map and HUD -----------------------------------------------------------------
+const hud = document.getElementById('hud');
+const mapCanvas = document.getElementById('map');
+const mapCtx = mapCanvas.getContext('2d');
+const MAP_PAD = 14;
+const MAP_TRACK_Y = 26;
+
+function updateHud() {
+  if (!activeZone) { hud.textContent = 'Loading...'; return; }
+  if (activeZone.isSpine) {
+    const along = Math.min(Math.max(camera.position.x - spine.x0, 0), spine.length).toFixed(0);
+    hud.textContent = `The Spine | ${along} m along | Heard ${heard.size} / ${TOPIC_COUNT}`;
+  } else {
+    hud.textContent = `${activeZone.name} | Heard ${heard.size} / ${TOPIC_COUNT}`;
+  }
+  mapCanvas.style.display = activeZone && activeZone.isSpine ? 'block' : 'none';
+}
+
+function mapX(x) {
+  const W = mapCanvas.width - 2 * MAP_PAD;
+  return MAP_PAD + ((x - spine.x0) / spine.length) * W;
+}
+
+function drawMap() {
+  if (!activeZone || !activeZone.isSpine) return;
+  const ctx = mapCtx;
+  const W = mapCanvas.width, H = mapCanvas.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#6b6f76';
+  ctx.fillRect(MAP_PAD, MAP_TRACK_Y - 3, W - 2 * MAP_PAD, 6);
+  ctx.fillStyle = '#9aa4b2';
+  ctx.fillRect(MAP_PAD - 8, MAP_TRACK_Y - 8, 8, 16);
+  ctx.fillRect(W - MAP_PAD, MAP_TRACK_Y - 8, 8, 16);
+  ctx.fillStyle = '#ffd66b';
+  for (const p of pois) { ctx.beginPath(); ctx.arc(mapX(p.x), MAP_TRACK_Y, 3, 0, Math.PI * 2); ctx.fill(); }
+  ctx.fillStyle = '#7fe8ff';
+  for (const l of spineLifts) ctx.fillRect(mapX(l.x) - 1, MAP_TRACK_Y - 9, 2, 5);
+  ctx.fillStyle = '#c9d2dc';
+  for (const n of npcs) ctx.fillRect(mapX(n.x), MAP_TRACK_Y + 4, 1.5, 3);
+  if (train) {
+    const x0 = mapX(trainX), x1 = mapX(trainX + trainSpec.length);
+    ctx.fillStyle = '#3a8fd6';
+    ctx.fillRect(x0, MAP_TRACK_Y - 2, Math.max(x1 - x0, 2), 4);
+  }
+  const px = mapX(camera.position.x);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(px - 1, MAP_TRACK_Y - 12, 2, 24);
+  ctx.fillStyle = '#cfd6df';
+  ctx.font = '10px sans-serif';
+  ctx.fillText('AFT', 2, H - 6);
+  ctx.textAlign = 'right';
+  ctx.fillText('FORE', W - 2, H - 6);
+  ctx.textAlign = 'left';
+}
+
+// --- Build the world -----------------------------------------------------------
+Promise.all([spineDataReady, zonesDataReady, titlesReady]).then(async ([spineData, zonesData]) => {
+  // Spine (the hub) keeps its own data: doors, signs, lifts, train, and NPCs.
+  spine = spineData.spine;
+  pois = spineData.pois || [];
+  spineDoors = spineData.doors || [];
+  spineLifts = spineData.lifts || [];
+  trainSpec = spineData.train || trainSpec;
+  trainMin = spine.x0 + 30;
+  trainMax = spine.x1 - 30 - trainSpec.length;
+  trainX = trainMin;
+
+  spineZone = {
+    id: 'spine', name: 'The Spine', isSpine: true, lift: false,
+    bounds: { min: spineData.bounds.min, max: spineData.bounds.max },
+    colliders: spineData.colliders,
+    spawn: [spine.x0 + 20, 0],
+    interactables: [],
+  };
+  zones.spine = spineZone;
+
+  // Other zones from the manifest, all in world coordinates
+  for (const z of zonesData.zones) {
+    zones[z.id] = {
+      id: z.id, name: z.name, isSpine: false, lift: !!z.lift,
+      bounds: z.bounds, colliders: z.colliders, spawn: z.spawn,
+      exit: z.exit || null, hall: z.hall, side: z.side,
+      interactables: [],
+    };
+  }
+
+  // Load the GLBs: the Spine (at the origin), the rooms, and the engine room (offset).
+  const glbCache = {};
+  const loadOnce = url => glbCache[url] || (glbCache[url] = loadGlb(url));
+  const spineGltf = await loadOnce('../spine/spine.glb');
+  scene.add(spineGltf.scene);
+  train = spineGltf.scene.getObjectByName('Train') || null;
+  bindDoorLights(spineGltf.scene);
+
+  const roomsGltf = await loadOnce('rooms.glb');
+  scene.add(roomsGltf.scene);
+  for (const z of zonesData.zones) {
+    if (z.glb === 'rooms.glb') continue;
+    const gltf = await loadOnce(z.glb);
+    const holder = new THREE.Group();
+    holder.add(gltf.scene);
+    holder.position.set(z.glbOffset[0], 0, -z.glbOffset[1]);
+    scene.add(holder);
+  }
+
+  // Interactables for the Spine
+  for (const p of pois) {
+    spineZone.interactables.push({
+      x: p.x, y: p.y, range: POI_RANGE,
+      label: () => `Read sign: ${p.name}`,
+      use: () => {
+        showDialogue(p.name, p.text, 16);
+        hear(p.source.replace(/^lore\//, ''), p.text);
+      },
+    });
+  }
+  for (const l of spineLifts) {
+    spineZone.interactables.push({
+      x: l.stance[0], y: l.stance[1], range: 2.5,
+      label: () => `Use the lift`,
+      use: () => openLiftMenu(),
+    });
+  }
+  // Hall doors that lead into a room
+  for (const z of Object.values(zones)) {
+    if (z.hall === undefined) continue;
+    const door = spineDoors.find(d => d.name === `Door_${z.side}_${z.hall}`);
+    if (!door) continue;
+    const y = door.side === 'port' ? -9.4 : 9.4;
+    spineZone.interactables.push({
+      x: door.x, y, range: 2.4,
+      label: () => `Enter ${z.name}`,
+      use: () => travel(z.id, z.spawn),
+    });
+  }
+
+  // Exit interactables for every room
+  for (const z of Object.values(zones)) {
+    if (z.isSpine || !z.exit) continue;
+    z.interactables.push({
+      x: z.exit.x, y: z.exit.y, range: 2.2,
+      label: () => z.exit.label,
+      use: () => travel('spine', spineSpawnFor(z.exit.target, z)),
+    });
+  }
+
+  createNpcs();
+  for (const n of npcs) {
+    spineZone.interactables.push({
+      get x() { return n.x; },
+      get y() { return n.y; },
+      range: NPC_RANGE,
+      label: () => `Talk to ${n.name} (${n.role})`,
+      use: () => talkTo(n),
+    });
+  }
+
+  // Start on the Spine (or wherever ?zone= points)
+  const params = new URLSearchParams(location.search);
+  activeZone = spineZone;
+  const startX = params.has('x') ? parseFloat(params.get('x')) : spine.x0 + 20;
+  const startY = params.has('y') ? parseFloat(params.get('y')) : 0;
+  const yaw = (params.has('yaw') ? parseFloat(params.get('yaw')) : 0) * Math.PI / 180;
+  camera.position.set(startX, EYE_HEIGHT, -startY);
+  camera.lookAt(startX + Math.cos(yaw) * 50, EYE_HEIGHT, -startY - Math.sin(yaw) * 50);
+
+  // Debug parameters (screenshots and tests):
+  //   ?shot=1        hide the start overlay
+  //   ?zone=ID       start in another zone (e.g. harbour_hall, bow_deck, engine_room)
+  //   ?menu=1        open the lift menu
+  //   ?talk=N        stand next to NPC N and talk to them
+  //   ?knock=1       make NPC 0 knock on the first door right away
+  //   ?journal=1     open the journal
+  //   ?open=N        show sign N's text
+  //   ?train=600     place the train at X = 600 m and hold it
+  if (params.has('shot')) overlay.classList.add('hidden');
+  if (params.has('train')) { trainX = parseFloat(params.get('train')); trainPause = 1e9; }
+  if (params.has('zone') && zones[params.get('zone')]) {
+    activeZone = zones[params.get('zone')];
+    const s = activeZone.spawn;
+    camera.position.set(s[0], EYE_HEIGHT, -s[1]);
+    camera.lookAt(s[0] + 5, EYE_HEIGHT, -s[1]);
+  }
+  if (params.has('open') && pois[parseInt(params.get('open'), 10)]) {
+    const p = pois[parseInt(params.get('open'), 10)];
+    showDialogue(p.name, p.text, 60);
+    hear(p.source.replace(/^lore\//, ''), p.text);
+  }
+  if (params.has('talk') && npcs[parseInt(params.get('talk'), 10)]) {
+    const n = npcs[parseInt(params.get('talk'), 10)];
+    camera.position.set(n.x - 3.2, EYE_HEIGHT, -n.y);
+    camera.lookAt(n.x, EYE_HEIGHT, -n.y);
+    talkTo(n);
+  }
+  if (params.has('knock') && npcs[0] && spineDoors[0]) {
+    const [sx, sy] = doorStance(spineDoors[0]);
+    npcs[0].x = sx; npcs[0].y = sy;
+    npcs[0].group.position.set(sx, 0, -sy);
+    npcs[0].wait = 0;
+    npcs[0].doorTarget = null;
+    startKnock(npcs[0], spineDoors[0]);
+  }
+  //   ?go=ZONE       travel to a zone (through the fade, as a lift or door would)
+  //   ?back=1        leave the current room by its exit
+  if (params.has('go') && zones[params.get('go')]) {
+    const id = params.get('go');
+    setTimeout(() => travel(id, zones[id].spawn), 200);
+  }
+  if (params.has('back') && activeZone && activeZone.exit) {
+    const z = activeZone;
+    setTimeout(() => travel('spine', spineSpawnFor(z.exit.target, z)), 200);
+  }
+  if (params.has('menu')) openLiftMenu();
+  if (params.has('journal')) openJournal();
+}).catch(err => {
+  document.querySelector('#overlay div').textContent = 'Failed to load: ' + err;
+});
+
+// --- Loop ---------------------------------------------------------------------
+const timer = new THREE.Timer();
+function animate(timestamp) {
+  requestAnimationFrame(animate);
+  timer.update(timestamp);
+  const dt = Math.min(timer.getDelta(), 0.05);
+  updateTrain(dt);
+  updateMovement(dt);
+  if (!panelOpen && spineZone) updateNpcs(dt);
+  updateInteraction();
+  updateOverlays();
+  updateHud();
+  drawMap();
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>

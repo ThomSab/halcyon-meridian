@@ -12,6 +12,7 @@ Worldbuilding notes, a text adventure, 2D/SVG art, and low-poly 3D for the **Hal
 | `spine/` | Walkable Spine (Deck 9): NPCs who talk and knock on doors, signs, a train, a journal, and a strip map. Blender build script, GLB, collision data, viewer, and `snippets.js` with the topic lines. |
 | `engine_room/` | Walkable low-poly engine room: Blender build script, GLB, collision data, viewer. |
 | `ship/` | Exterior overview of the whole ship with an orbit camera: Blender build script, GLB, viewer. |
+| `world/` | The main game: every walkable zone in one page, connected by lifts and doors. Room build script, `rooms.glb`, `zones.json`, `index.html`. |
 | `package.json`, `package-lock.json` | Node deps. Only `three` (0.187.0) is used, by the viewers. |
 
 ## Viewing
@@ -22,11 +23,31 @@ The viewers load files with `fetch` and ES modules, so they must be served over 
 python -m http.server 8000
 ```
 
-- The Spine (walk): http://localhost:8000/spine/index.html
+- The ship (main game, all zones): http://localhost:8000/world/index.html
+- The Spine only (earlier viewer): http://localhost:8000/spine/index.html
 - Engine room (walk): http://localhost:8000/engine_room/index.html
 - Ship overview (orbit): http://localhost:8000/ship/index.html
 
 Run the server from the repo root so `node_modules/three` resolves. Dependencies: `npm install`.
+
+## The ship (world viewer)
+
+`world/index.html` is the main game: one page that holds every walkable zone.
+
+- **Zones:** The Spine (the hub), the Engine Room, Bow Deck, Solarium Park, Bridge, Greenhouse, Classroom, Residential Cabin, and five rooms behind the market-hall doors (Harbour Hall, Commissary Canteen, Spine Theatre, Shift-Change Hall, Harbour Care Ward).
+- **Getting around:** Use a lift on the Spine (E, at the lift shafts in the gaps between halls) to pick a level from the menu. Use a hall door (E) to go inside. Every room has an exit prompt that takes you back.
+- **Transitions:** Zones are separate spaces joined by a short fade, not walked through continuously. The bow, the engine room, and the other decks are not physically connected to the Spine.
+- **What carries over:** NPCs (Spine only), knocks on doors, signs, the train, the journal, and the lore discovery.
+
+Rebuild the rooms (the Spine build also places the lifts):
+
+```powershell
+& "C:\Program Files\Blender Foundation\Blender 5.3\blender.exe" --background --factory-startup --python "world\build_rooms.py"
+```
+
+`world/build_rooms.py` writes `rooms.glb` and `zones.json`. The rooms are placed on a grid far from the Spine, and the engine room is moved onto the same grid. Rooms are blockouts: boxes, rails, and simple props.
+
+Debug parameters: `?zone=ID` (start in a zone), `?go=ID` (travel), `?back=1` (leave the current room), `?menu=1` (open the lift menu). Zone IDs: `engine_room`, `bow_deck`, `solarium`, `bridge`, `greenhouse`, `classroom`, `cabin`, `harbour_hall`, `commissary`, `theatre`, `shift_hall`, `care_ward`.
 
 ## The Spine (walkable)
 
