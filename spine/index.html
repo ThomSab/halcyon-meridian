@@ -95,6 +95,10 @@ let spine = { x0: 0, x1: 1600, length: 1600 };
 function blocked(bx, by) {
   if (bx < bounds.min[0] + PLAYER_RADIUS || bx > bounds.max[0] - PLAYER_RADIUS) return true;
   if (by < bounds.min[1] + PLAYER_RADIUS || by > bounds.max[1] - PLAYER_RADIUS) return true;
+  if (train) {
+    const tb = trainBox(PLAYER_RADIUS);
+    if (bx > tb.x0 && bx < tb.x1 && Math.abs(by) < tb.hw) return true;
+  }
   for (const c of colliders) {
     if (c.type === 'box') {
       if (bx > c.min[0] - PLAYER_RADIUS && bx < c.max[0] + PLAYER_RADIUS &&
@@ -116,6 +120,16 @@ const hud = document.getElementById('hud');
 
 function updateMovement(dt) {
   if (!controls.isLocked) return;
+
+  // If the train has reached the player, push them out to the nearest side of the track.
+  if (train) {
+    const tb = trainBox(PLAYER_RADIUS);
+    const px = camera.position.x, py = -camera.position.z;
+    if (px > tb.x0 && px < tb.x1 && Math.abs(py) < tb.hw) {
+      const side = py >= 0 ? 1 : -1;
+      camera.position.z = -(side * tb.hw);
+    }
+  }
 
   camera.getWorldDirection(forward);
   forward.y = 0;
@@ -204,10 +218,41 @@ function updatePois() {
   if (openPoi && (!nearPoi || nearPoi !== openPoi)) closePanel();
 }
 
+// --- Electric train on the centre track ---------------------------------------
+// The train is an Object3D named "Train" in the GLB. Its position.x is the Blender X of the
+// rear (aft) end; it runs between the two ends of the Spine and pauses at each end.
+let train = null;
+let trainSpec = { length: 69, half_width: 1.5, speed: 6.94 };
+let trainMin = 130, trainMax = 1400;
+let trainX = 130;
+let trainDir = 1;
+let trainPause = 0;
+const TRAIN_PAUSE_SECONDS = 6;
+
+function trainBox(margin) {
+  return { x0: trainX - margin, x1: trainX + trainSpec.length + margin, hw: trainSpec.half_width + margin };
+}
+
+function updateTrain(dt) {
+  if (!train) return;
+  if (trainPause > 0) {
+    trainPause -= dt;
+  } else {
+    trainX += trainDir * trainSpec.speed * dt;
+    if (trainX >= trainMax) { trainX = trainMax; trainDir = -1; trainPause = TRAIN_PAUSE_SECONDS; }
+    if (trainX <= trainMin) { trainX = trainMin; trainDir = 1; trainPause = TRAIN_PAUSE_SECONDS; }
+  }
+  train.position.x = trainX;
+}
+
 // --- Load model and collision data -------------------------------------------
 const loader = new GLTFLoader();
 const modelReady = new Promise((resolve, reject) =>
-  loader.load('spine.glb', gltf => { scene.add(gltf.scene); resolve(); }, undefined, reject));
+  loader.load('spine.glb', gltf => {
+    scene.add(gltf.scene);
+    train = gltf.scene.getObjectByName('Train') || null;
+    resolve();
+  }, undefined, reject));
 const collisionReady = fetch('spine_colliders.json')
   .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
   .then(data => {
@@ -215,6 +260,10 @@ const collisionReady = fetch('spine_colliders.json')
     colliders = data.colliders;
     spine = data.spine;
     pois = data.pois || [];
+    if (data.train) trainSpec = data.train;
+    trainMin = spine.x0 + 30;
+    trainMax = spine.x1 - 30 - trainSpec.length;
+    trainX = trainMin;
   });
 
 // Optional URL parameters, mainly for screenshots:
@@ -231,6 +280,11 @@ Promise.all([modelReady, collisionReady]).then(() => {
   // Blender heading (cos, sin) maps to three.js (cos, -sin) on the X and Z axes.
   camera.position.set(startX, EYE_HEIGHT, -startY);
   camera.lookAt(startX + Math.cos(yaw) * 50, EYE_HEIGHT, -startY - Math.sin(yaw) * 50);
+  //   ?train=600        place the train at X = 600 m and hold it there (screenshots)
+  if (params.has('train') && train) {
+    trainX = parseFloat(params.get('train'));
+    trainPause = 1e9;
+  }
   //   ?open=N           open the text panel for point of interest N (screenshots)
   if (params.has('open') && pois[parseInt(params.get('open'), 10)]) {
     openPanel(pois[parseInt(params.get('open'), 10)]);
@@ -244,7 +298,9 @@ const timer = new THREE.Timer();
 function animate(timestamp) {
   requestAnimationFrame(animate);
   timer.update(timestamp);
-  updateMovement(Math.min(timer.getDelta(), 0.05));
+  const dt = Math.min(timer.getDelta(), 0.05);
+  updateTrain(dt);
+  updateMovement(dt);
   updateHud();
   updatePois();
   renderer.render(scene, camera);

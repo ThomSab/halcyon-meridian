@@ -224,6 +224,26 @@ while x <= SPINE_X1 - 20.0:
     lamp_index += 1
     x += 40.0
 
+# --- Electric train on the centre track ----------------------------------------
+# Three cars parented to an empty named "Train". The viewer moves the empty along X.
+# The train's rear (aft) end is at X = 0 in this model; cars are 22 m long, 1.5 m gap.
+TRAIN_CAR_LEN = 22.0
+TRAIN_GAP = 1.5
+TRAIN_CARS = 3
+TRAIN_LENGTH = TRAIN_CARS * TRAIN_CAR_LEN + (TRAIN_CARS - 1) * TRAIN_GAP   # 69 m
+
+bpy.ops.object.empty_add(type="PLAIN_AXES", location=(0, 0, 0))
+train_root = bpy.context.active_object
+train_root.name = "Train"
+
+for i in range(TRAIN_CARS):
+    x0 = i * (TRAIN_CAR_LEN + TRAIN_GAP)
+    body = box(f"TrainCar_{i}", x0, x0 + TRAIN_CAR_LEN, -1.5, 1.5, 0.15, 3.55, make_mat(f"TrainBody_{i}", (0.15, 0.35, 0.55), rough=0.4))
+    windows = box(f"TrainWindows_{i}", x0 + 1.0, x0 + TRAIN_CAR_LEN - 1.0, -1.56, 1.56, 1.6, 2.6, MAT["tower_win"])
+    roof = box(f"TrainRoof_{i}", x0, x0 + TRAIN_CAR_LEN, -1.5, 1.5, 3.55, 3.7, MAT["steel"])
+    for part in (body, windows, roof):
+        part.parent = train_root
+
 # --- Export ---------------------------------------------------------------------
 glb_path = os.path.join(OUT_DIR, "spine.glb")
 bpy.ops.export_scene.gltf(filepath=glb_path, export_format="GLB")
@@ -234,6 +254,7 @@ with open(json_path, "w") as f:
         "bounds": {"min": [SPINE_X0, -SPINE_HALF_WIDTH], "max": [SPINE_X1, SPINE_HALF_WIDTH]},
         "spine": {"x0": SPINE_X0, "x1": SPINE_X1, "length": SPINE_X1 - SPINE_X0},
         "pois": poi_records,
+        "train": {"length": TRAIN_LENGTH, "half_width": 1.5, "speed": 6.94},
         "colliders": colliders,
     }, f, indent=2)
 

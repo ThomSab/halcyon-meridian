@@ -51,6 +51,11 @@
       "y": 7.0
     }
   ],
+  "train": {
+    "length": 69.0,
+    "half_width": 1.5,
+    "speed": 6.94
+  },
   "colliders": [
     {
       "type": "box",
