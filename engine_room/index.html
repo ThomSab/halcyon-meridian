@@ -117,19 +117,20 @@ function updateMovement(dt) {
   const dz = (forward.z * f + right.z * r);
   const len = Math.hypot(dx, dz);
   const mx = (dx / len) * speed;
-  const mz = (dz / len) * speed;
+  // Blender y runs opposite to three.js z (by = -three.z), so the y step is negated.
+  const my = -(dz / len) * speed;
 
   // Convert to Blender coords: bx = three.x, by = -three.z
   const bx = camera.position.x;
   const by = -camera.position.z;
 
   let nx = bx, ny = by;
-  if (!blocked(bx + mx, by + mz)) {
-    nx = bx + mx; ny = by + mz;
+  if (!blocked(bx + mx, by + my)) {
+    nx = bx + mx; ny = by + my;
   } else if (!blocked(bx + mx, by)) {
     nx = bx + mx;
-  } else if (!blocked(bx, by + mz)) {
-    ny = by + mz;
+  } else if (!blocked(bx, by + my)) {
+    ny = by + my;
   }
 
   camera.position.x = nx;
@@ -154,10 +155,11 @@ Promise.all([modelReady, collisionReady]).then(() => {
 });
 
 // --- Loop ---------------------------------------------------------------------
-const clock = new THREE.Clock();
-function animate() {
+const timer = new THREE.Timer();
+function animate(timestamp) {
   requestAnimationFrame(animate);
-  updateMovement(Math.min(clock.getDelta(), 0.05));
+  timer.update(timestamp);
+  updateMovement(Math.min(timer.getDelta(), 0.05));
   renderer.render(scene, camera);
 }
 animate();

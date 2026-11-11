@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Halcyon Meridian - The Spine</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; }
+  #overlay {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(0, 0, 0, 0.55); color: #fff; cursor: pointer; text-align: center;
+  }
+  #overlay.hidden { display: none; }
+  #overlay div { background: rgba(0, 0, 0, 0.6); padding: 16px 24px; border-radius: 6px; line-height: 1.6; }
+  #hud {
+    position: absolute; top: 10px; left: 10px; color: #fff; font-size: 13px;
+    background: rgba(0, 0, 0, 0.5); padding: 6px 10px; border-radius: 4px; pointer-events: none;
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "../node_modules/three/build/three.module.js",
+    "three/addons/": "../node_modules/three/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="overlay"><div>Click to start<br><small>WASD / arrows to walk, Shift to run, mouse to look, Esc to release</small></div></div>
+<div id="hud">The Spine - Halcyon Meridian</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+const PLAYER_RADIUS = 0.35;
+const EYE_HEIGHT = 1.7;
+const WALK_SPEED = 3.0;   // m/s
+const RUN_SPEED = 6.0;    // m/s
+
+// --- Renderer, scene, camera --------------------------------------------------
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9fb4c7);
+scene.fog = new THREE.Fog(0x9fb4c7, 300, 900);
+
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.05, 2000);
+
+// --- Lighting (skylight from above) ------------------------------------------
+scene.add(new THREE.HemisphereLight(0xe8f0ff, 0x3a3a3a, 1.2));
+const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+sun.position.set(-200, 400, 100);   // three.js coordinates (Y is up)
+scene.add(sun);
+
+// --- Controls -----------------------------------------------------------------
+const controls = new PointerLockControls(camera, renderer.domElement);
+const overlay = document.getElementById('overlay');
+overlay.addEventListener('click', () => controls.lock());
+controls.addEventListener('lock', () => overlay.classList.add('hidden'));
+controls.addEventListener('unlock', () => overlay.classList.remove('hidden'));
+
+const keys = {};
+document.addEventListener('keydown', e => { keys[e.code] = true; });
+document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+// --- Collision data (Blender coordinates: bx = x, by = -three.z) -------------
+let bounds = { min: [0, -20], max: [1600, 20] };
+let colliders = [];
+let spine = { x0: 0, x1: 1600, length: 1600 };
+
+function blocked(bx, by) {
+  if (bx < bounds.min[0] + PLAYER_RADIUS || bx > bounds.max[0] - PLAYER_RADIUS) return true;
+  if (by < bounds.min[1] + PLAYER_RADIUS || by > bounds.max[1] - PLAYER_RADIUS) return true;
+  for (const c of colliders) {
+    if (c.type === 'box') {
+      if (bx > c.min[0] - PLAYER_RADIUS && bx < c.max[0] + PLAYER_RADIUS &&
+          by > c.min[1] - PLAYER_RADIUS && by < c.max[1] + PLAYER_RADIUS) return true;
+    } else if (c.type === 'circle') {
+      const dx = bx - c.center[0], dy = by - c.center[1];
+      const r = c.radius + PLAYER_RADIUS;
+      if (dx * dx + dy * dy < r * r) return true;
+    }
+  }
+  return false;
+}
+
+// --- Movement with wall sliding ----------------------------------------------
+const forward = new THREE.Vector3();
+const right = new THREE.Vector3();
+const UP = new THREE.Vector3(0, 1, 0);
+const hud = document.getElementById('hud');
+
+function updateMovement(dt) {
+  if (!controls.isLocked) return;
+
+  camera.getWorldDirection(forward);
+  forward.y = 0;
+  forward.normalize();
+  right.crossVectors(forward, UP).normalize();
+
+  let f = 0, r = 0;
+  if (keys['KeyW'] || keys['ArrowUp']) f += 1;
+  if (keys['KeyS'] || keys['ArrowDown']) f -= 1;
+  if (keys['KeyD'] || keys['ArrowRight']) r += 1;
+  if (keys['KeyA'] || keys['ArrowLeft']) r -= 1;
+  if (f === 0 && r === 0) return;
+
+  const speed = (keys['ShiftLeft'] || keys['ShiftRight'] ? RUN_SPEED : WALK_SPEED) * dt;
+  const dx = forward.x * f + right.x * r;
+  const dz = forward.z * f + right.z * r;
+  const len = Math.hypot(dx, dz);
+  const mx = (dx / len) * speed;
+  // Blender y runs opposite to three.js z (by = -three.z), so the y step is negated.
+  const my = -(dz / len) * speed;
+
+  // Blender coords: bx = three.x, by = -three.z
+  const bx = camera.position.x;
+  const by = -camera.position.z;
+
+  let nx = bx, ny = by;
+  if (!blocked(bx + mx, by + my)) {
+    nx = bx + mx; ny = by + my;
+  } else if (!blocked(bx + mx, by)) {
+    nx = bx + mx;
+  } else if (!blocked(bx, by + my)) {
+    ny = by + my;
+  }
+
+  camera.position.x = nx;
+  camera.position.z = -ny;
+}
+
+function updateHud() {
+  const bx = camera.position.x;
+  const along = Math.min(Math.max(bx - spine.x0, 0), spine.length).toFixed(0);
+  hud.textContent = `The Spine - Halcyon Meridian | ${along} m along the Spine (of ${spine.length.toFixed(0)} m)`;
+}
+
+// --- Load model and collision data -------------------------------------------
+const loader = new GLTFLoader();
+const modelReady = new Promise((resolve, reject) =>
+  loader.load('spine.glb', gltf => { scene.add(gltf.scene); resolve(); }, undefined, reject));
+const collisionReady = fetch('spine_colliders.json')
+  .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+  .then(data => {
+    bounds = data.bounds;
+    colliders = data.colliders;
+    spine = data.spine;
+  });
+
+Promise.all([modelReady, collisionReady]).then(() => {
+  // Start at the aft end of the Spine, in the centre aisle, looking fore.
+  const startX = spine.x0 + 20;
+  camera.position.set(startX, EYE_HEIGHT, 0);
+  camera.lookAt(startX + 100, EYE_HEIGHT, 0);
+}).catch(err => {
+  document.querySelector('#overlay div').textContent = 'Failed to load: ' + err;
+});
+
+// --- Loop ---------------------------------------------------------------------
+const timer = new THREE.Timer();
+function animate(timestamp) {
+  requestAnimationFrame(animate);
+  timer.update(timestamp);
+  updateMovement(Math.min(timer.getDelta(), 0.05));
+  updateHud();
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
