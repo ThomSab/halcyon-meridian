@@ -16,6 +16,10 @@
     position: absolute; top: 10px; left: 10px; color: #fff; font-size: 13px;
     background: rgba(0, 0, 0, 0.5); padding: 6px 10px; border-radius: 4px; pointer-events: none;
   }
+  #map {
+    position: absolute; top: 10px; right: 10px; background: rgba(0, 0, 0, 0.5);
+    border-radius: 4px; pointer-events: none;
+  }
   #prompt {
     position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); color: #fff;
     font-size: 15px; background: rgba(0, 0, 0, 0.6); padding: 6px 12px; border-radius: 4px;
@@ -42,6 +46,7 @@
 <body>
 <div id="overlay"><div>Click to start<br><small>WASD / arrows to walk, Shift to run, mouse to look, Esc to release</small></div></div>
 <div id="hud">The Spine - Halcyon Meridian</div>
+<canvas id="map" width="360" height="56"></canvas>
 <div id="prompt"></div>
 <div id="panel"><h3 id="ptitle"></h3><p id="ptext"></p><small id="psource"></small></div>
 
@@ -204,6 +209,58 @@ function togglePoi() {
   if (nearPoi) openPanel(nearPoi);
 }
 
+// --- Strip map (top right): the whole Spine as a bar -------------------------
+const mapCanvas = document.getElementById('map');
+const mapCtx = mapCanvas.getContext('2d');
+const MAP_PAD = 14;
+const MAP_TRACK_Y = 26;
+
+function mapX(x) {
+  const W = mapCanvas.width - 2 * MAP_PAD;
+  return MAP_PAD + ((x - spine.x0) / spine.length) * W;
+}
+
+function drawMap() {
+  const ctx = mapCtx;
+  const W = mapCanvas.width, H = mapCanvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Spine bar and the two towers at either end
+  ctx.fillStyle = '#6b6f76';
+  ctx.fillRect(MAP_PAD, MAP_TRACK_Y - 3, W - 2 * MAP_PAD, 6);
+  ctx.fillStyle = '#9aa4b2';
+  ctx.fillRect(MAP_PAD - 8, MAP_TRACK_Y - 8, 8, 16);
+  ctx.fillRect(W - MAP_PAD, MAP_TRACK_Y - 8, 8, 16);
+
+  // Points of interest
+  ctx.fillStyle = '#ffd66b';
+  for (const p of pois) {
+    ctx.beginPath();
+    ctx.arc(mapX(p.x), MAP_TRACK_Y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Train
+  if (train) {
+    const x0 = mapX(trainX), x1 = mapX(trainX + trainSpec.length);
+    ctx.fillStyle = '#3a8fd6';
+    ctx.fillRect(x0, MAP_TRACK_Y - 2, Math.max(x1 - x0, 2), 4);
+  }
+
+  // Player
+  const px = mapX(camera.position.x);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(px - 1, MAP_TRACK_Y - 12, 2, 24);
+
+  // Labels
+  ctx.fillStyle = '#cfd6df';
+  ctx.font = '10px sans-serif';
+  ctx.fillText('AFT', 2, H - 6);
+  ctx.textAlign = 'right';
+  ctx.fillText('FORE', W - 2, H - 6);
+  ctx.textAlign = 'left';
+}
+
 function updatePois() {
   const bx = camera.position.x;
   const by = -camera.position.z;
@@ -303,6 +360,7 @@ function animate(timestamp) {
   updateMovement(dt);
   updateHud();
   updatePois();
+  drawMap();
   renderer.render(scene, camera);
 }
 animate();

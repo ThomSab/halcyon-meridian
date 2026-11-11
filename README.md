@@ -29,9 +29,17 @@ Blender 5.3 is installed at `C:\Program Files\Blender Foundation\Blender 5.3\ble
 ## The Spine (walkable ship)
 
 - `spine/build_spine.py`: Blender script that builds the Spine blockout and exports `spine.glb` and `spine_colliders.json`.
-- `spine/index.html`: first-person viewer. Walk from the aft tower to the fore tower along the centre aisle. The HUD shows your distance along the Spine.
+- `spine/index.html`: first-person viewer. Walk from the aft tower to the fore tower along the centre aisle.
+  - HUD (top left): distance along the Spine.
+  - Strip map (top right): the Spine as a bar, with points of interest (yellow), the train (blue), and your position (white).
+  - Points of interest: stand within 5 m of a prompt and press E to read the lore text. E again closes it.
+  - Electric train: shuttles along the centre track at 25 km/h (the lore's maximum), pausing 6 s at each end. It blocks the aisle; if it reaches you, you are pushed out to the side of the track.
 
-Layout: aft tower at X = 0 to 100 m, fore tower at X = 1500 to 1600 m, Spine floor between them (X = 100 to 1500 m, 40 m wide, Z = 0 is the Deck 9 floor). Market halls line both sides, leaving a 22 m clear centre aisle. The Spine is 1,400 m here, against about 1.5 km in the lore; the towers are plain boxes; there is no hull or sky geometry beyond the Spine.
+Layout: aft tower at X = 0 to 100 m, fore tower at X = 1500 to 1600 m, Spine floor between them (X = 100 to 1500 m, 40 m wide, Z = 0 is the Deck 9 floor). Market halls line both sides, leaving a 22 m clear centre aisle, with awnings, lit fronts, and planters with trees in the gaps. Lamp posts line the aisle. The Spine is 1,400 m here, against about 1.5 km in the lore; the towers are plain boxes; there is no hull or sky geometry beyond the Spine.
+
+Points of interest (set in `POIS` in `build_spine.py`) take their text from the lore files named in each entry.
+
+URL parameters for testing and screenshots: `?x=800&y=0&yaw=0` (start position in metres and heading, 0 = fore), `?shot=1` (hide the start overlay), `?open=0` (open point of interest 0's panel), `?train=600` (place the train at X = 600 m and hold it).
 
 Rebuild:
 
@@ -81,7 +89,8 @@ Not done or not decided:
 - **Three.js MCP server not configured.** Candidate: `threejs-devtools-mcp` on npm (unverified). Add to `opencode.json` under `"mcp"` if wanted.
 - **Mouse/keyboard controls not tested interactively.** Only a headless screenshot was checked.
 - The interior of the reactor citadels is not modelled; they are solid cylinders.
-- The Spine viewer's collision and movement were not played interactively; only a headless screenshot was checked.
+- The Spine's movement, collisions, train push-out, and the E panel were checked with headless screenshots and a movement simulation, not by playing it interactively.
+- Spine visuals are untextured boxes. The GLB is about 1.3 MB because each sleeper, tree, and lamp is its own mesh; merging them would reduce this.
 - Only the engine room and the Spine are modelled. Residential terraces, the bridge, and the hull are not.
 
 ## Next steps (suggested)
