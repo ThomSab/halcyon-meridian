@@ -1,5 +1,5 @@
 """
-Builds a rudimentary blockout of the Spine (Deck 9) of the Halcyon Meridian and exports it as GLB.
+Builds a blockout of the Spine (Deck 9) of the Halcyon Meridian and exports it as GLB.
 
 Run headless:
   "C:\Program Files\Blender Foundation\Blender 5.3\blender.exe" --background --factory-startup --python build_spine.py
@@ -11,7 +11,9 @@ Deck 9 (Spine floor) is at Z = 0.
 Layout (from lore/ship_structure_and_layout.md, simplified):
   - Spine: central boulevard, 40 m wide, about 1.4 km long between the two towers.
   - Residential towers: one forward and one aft, closing each end of the Spine.
-  - Market halls: blocks lining both sides of the Spine.
+  - Market halls: blocks lining both sides, with awnings and lit fronts.
+  - Planters with trees in the gaps between halls.
+  - Electric rail track down the centre, with lamp posts along the aisle.
   - Low rails along both edges of the Spine.
 
 Also writes spine_colliders.json for the web viewer.
@@ -35,22 +37,37 @@ SPINE_X0 = TOWER_LENGTH
 SPINE_X1 = SHIP_LENGTH - TOWER_LENGTH
 
 
-def make_mat(name, rgb, rough=0.7, metal=0.0):
+def make_mat(name, rgb, rough=0.7, metal=0.0, emit=0.0):
     m = bpy.data.materials.new(name)
     m.use_nodes = True
     bsdf = m.node_tree.nodes["Principled BSDF"]
     bsdf.inputs["Base Color"].default_value = (rgb[0], rgb[1], rgb[2], 1.0)
     bsdf.inputs["Roughness"].default_value = rough
     bsdf.inputs["Metallic"].default_value = metal
+    if emit > 0:
+        bsdf.inputs["Emission Color"].default_value = (rgb[0], rgb[1], rgb[2], 1.0)
+        bsdf.inputs["Emission Strength"].default_value = emit
     return m
 
 
 MAT = {
-    "deck":   make_mat("Deck",   (0.42, 0.40, 0.36), rough=0.9),
-    "tower":  make_mat("Tower",  (0.75, 0.77, 0.80), rough=0.6),
-    "hall":   make_mat("Hall",   (0.60, 0.50, 0.40), rough=0.7),
-    "rail":   make_mat("Rail",   (0.20, 0.30, 0.35), rough=0.5, metal=0.4),
+    "deck":      make_mat("Deck",      (0.42, 0.40, 0.36), rough=0.9),
+    "tower":     make_mat("Tower",     (0.75, 0.77, 0.80), rough=0.6),
+    "hall":      make_mat("Hall",      (0.60, 0.50, 0.40), rough=0.7),
+    "rail":      make_mat("Rail",      (0.20, 0.30, 0.35), rough=0.5, metal=0.4),
+    "steel":     make_mat("Steel",     (0.45, 0.46, 0.48), rough=0.4, metal=0.7),
+    "wood":      make_mat("Sleeper",   (0.30, 0.22, 0.14), rough=0.9),
+    "pole":      make_mat("Pole",      (0.25, 0.25, 0.27), rough=0.5, metal=0.5),
+    "lamp":      make_mat("Lamp",      (1.0, 0.92, 0.75), rough=0.3, emit=6.0),
+    "planter":   make_mat("Planter",   (0.35, 0.25, 0.18), rough=0.9),
+    "foliage":   make_mat("Foliage",   (0.20, 0.45, 0.22), rough=0.8),
+    "awn_red":   make_mat("AwningRed", (0.60, 0.20, 0.18), rough=0.8),
+    "awn_cream": make_mat("AwningCream", (0.85, 0.80, 0.65), rough=0.8),
+    "awn_teal":  make_mat("AwningTeal", (0.20, 0.50, 0.50), rough=0.8),
+    "hall_lit":  make_mat("HallFront", (1.0, 0.70, 0.40), rough=0.5, emit=0.5),
+    "tower_win": make_mat("TowerWindow", (0.70, 0.85, 1.0), rough=0.3, emit=1.5),
 }
+AWNINGS = [MAT["awn_red"], MAT["awn_cream"], MAT["awn_teal"]]
 
 colliders = []
 
@@ -69,6 +86,23 @@ def box(name, x0, x1, y0, y1, z0, z1, mat, collide=False):
     return o
 
 
+def pole(name, x, y, z0, z1, radius, mat):
+    bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=radius, depth=z1 - z0,
+                                        location=(x, y, (z0 + z1) / 2))
+    o = bpy.context.active_object
+    o.name = name
+    o.data.materials.append(mat)
+    return o
+
+
+def ball(name, x, y, z, radius, mat):
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=8, ring_count=5, radius=radius, location=(x, y, z))
+    o = bpy.context.active_object
+    o.name = name
+    o.data.materials.append(mat)
+    return o
+
+
 # --- Spine deck (walkable floor) ------------------------------------------------
 box("Spine_Deck", SPINE_X0, SPINE_X1, -SPINE_HALF_WIDTH, SPINE_HALF_WIDTH, -0.5, 0.0, MAT["deck"])
 
@@ -78,14 +112,29 @@ box("Tower_Aft", 0, TOWER_LENGTH, -TOWER_HALF_WIDTH, TOWER_HALF_WIDTH, 0, TOWER_
 box("Tower_Fore", SHIP_LENGTH - TOWER_LENGTH, SHIP_LENGTH, -TOWER_HALF_WIDTH, TOWER_HALF_WIDTH, 0,
     TOWER_HEIGHT, MAT["tower"], collide=True)
 
+# Lit window bands on the faces that look onto the Spine
+for z in range(6, int(TOWER_HEIGHT) - 4, 9):
+    box(f"Win_Aft_{z}", TOWER_LENGTH, TOWER_LENGTH + 0.25, -28, 28, z, z + 3, MAT["tower_win"])
+    box(f"Win_Fore_{z}", SHIP_LENGTH - TOWER_LENGTH - 0.25, SHIP_LENGTH - TOWER_LENGTH, -28, 28, z, z + 3,
+        MAT["tower_win"])
+
 # --- Low rails along both edges of the Spine -----------------------------------
 box("Rail_Port", SPINE_X0, SPINE_X1, -SPINE_HALF_WIDTH - 0.3, -SPINE_HALF_WIDTH, 0, RAIL_HEIGHT,
     MAT["rail"], collide=True)
 box("Rail_Stbd", SPINE_X0, SPINE_X1, SPINE_HALF_WIDTH, SPINE_HALF_WIDTH + 0.3, 0, RAIL_HEIGHT,
     MAT["rail"], collide=True)
 
-# --- Market halls lining both sides ---------------------------------------------
-# Blocks sit between the rail and an inner aisle, with gaps for side streets.
+# --- Electric rail track down the centre ---------------------------------------
+for side, y in (("Port", -0.72), ("Stbd", 0.72)):
+    box(f"Track_{side}", SPINE_X0, SPINE_X1, y - 0.035, y + 0.035, 0, 0.15, MAT["steel"])
+x = SPINE_X0
+i = 0
+while x + 0.3 <= SPINE_X1:
+    box(f"Sleeper_{i}", x, x + 0.3, -1.0, 1.0, -0.02, 0.08, MAT["wood"])
+    x += 4.0
+    i += 1
+
+# --- Market halls, awnings, lit fronts, planters ------------------------------
 HALL_LEN = 40.0
 HALL_GAP = 20.0
 HALL_INNER = 11.0     # inner face of the hall, measured from centre
@@ -94,12 +143,44 @@ hall_index = 0
 x = SPINE_X0 + 20.0
 while x + HALL_LEN <= SPINE_X1 - 20.0:
     height = 7.0 if hall_index % 2 == 0 else 9.0
-    box(f"Hall_Port_{hall_index}", x, x + HALL_LEN, -HALL_OUTER, -HALL_INNER, 0, height,
-        MAT["hall"], collide=True)
-    box(f"Hall_Stbd_{hall_index}", x, x + HALL_LEN, HALL_INNER, HALL_OUTER, 0, height,
-        MAT["hall"], collide=True)
+    x0, x1 = x, x + HALL_LEN
+    box(f"Hall_Port_{hall_index}", x0, x1, -HALL_OUTER, -HALL_INNER, 0, height, MAT["hall"], collide=True)
+    box(f"Hall_Stbd_{hall_index}", x0, x1, HALL_INNER, HALL_OUTER, 0, height, MAT["hall"], collide=True)
+
+    awning = AWNINGS[hall_index % len(AWNINGS)]
+    box(f"Awning_Port_{hall_index}", x0, x1, -HALL_INNER, -8.5, 3.0, 3.4, awning)
+    box(f"Awning_Stbd_{hall_index}", x0, x1, 8.5, HALL_INNER, 3.0, 3.4, awning)
+
+    box(f"HallFront_Port_{hall_index}", x0 + 3, x1 - 3, -HALL_INNER - 0.08, -HALL_INNER + 0.02, 1.0,
+        height - 1.5, MAT["hall_lit"])
+    box(f"HallFront_Stbd_{hall_index}", x0 + 3, x1 - 3, HALL_INNER - 0.02, HALL_INNER + 0.08, 1.0,
+        height - 1.5, MAT["hall_lit"])
+
     hall_index += 1
     x += HALL_LEN + HALL_GAP
+
+# Planters with trees in the gaps between halls
+planter_index = 0
+gap_x = SPINE_X0 + 20.0 + HALL_LEN
+while gap_x + HALL_GAP <= SPINE_X1 - 20.0 + 0.1:
+    cx = gap_x + HALL_GAP / 2
+    for side, y in (("Port", -15.0), ("Stbd", 15.0)):
+        box(f"Planter_{side}_{planter_index}", cx - 1.5, cx + 1.5, y - 1.0, y + 1.0, 0, 1.0,
+            MAT["planter"], collide=True)
+        ball(f"Tree_{side}_{planter_index}", cx, y, 2.3, 1.3, MAT["foliage"])
+    planter_index += 1
+    gap_x += HALL_LEN + HALL_GAP
+
+# --- Lamp posts along the centre aisle -----------------------------------------
+lamp_index = 0
+x = SPINE_X0 + 20.0
+while x <= SPINE_X1 - 20.0:
+    for side, y in (("Port", -4.0), ("Stbd", 4.0)):
+        pole(f"LampPole_{side}_{lamp_index}", x, y, 0, 4.5, 0.08, MAT["pole"])
+        colliders.append({"type": "circle", "center": [x, y], "radius": 0.08})
+        box(f"LampHead_{side}_{lamp_index}", x - 0.25, x + 0.25, y - 0.25, y + 0.25, 4.5, 4.9, MAT["lamp"])
+    lamp_index += 1
+    x += 40.0
 
 # --- Export ---------------------------------------------------------------------
 glb_path = os.path.join(OUT_DIR, "spine.glb")
@@ -113,4 +194,5 @@ with open(json_path, "w") as f:
         "colliders": colliders,
     }, f, indent=2)
 
-print("EXPORTED", glb_path, "halls:", hall_index, "colliders:", len(colliders))
+print("EXPORTED", glb_path, "halls:", hall_index, "planters:", planter_index,
+      "lamps:", lamp_index, "colliders:", len(colliders))

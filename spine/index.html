@@ -154,11 +154,20 @@ const collisionReady = fetch('spine_colliders.json')
     spine = data.spine;
   });
 
+// Optional URL parameters, mainly for screenshots:
+//   ?x=800&y=0&yaw=0  start position (Blender metres) and heading (0 = fore, 90 = port)
+//   ?shot=1           hide the start overlay
+const params = new URLSearchParams(location.search);
+if (params.has('shot')) overlay.classList.add('hidden');
+
 Promise.all([modelReady, collisionReady]).then(() => {
-  // Start at the aft end of the Spine, in the centre aisle, looking fore.
-  const startX = spine.x0 + 20;
-  camera.position.set(startX, EYE_HEIGHT, 0);
-  camera.lookAt(startX + 100, EYE_HEIGHT, 0);
+  // Default: aft end of the Spine, in the centre aisle, looking fore.
+  const startX = params.has('x') ? parseFloat(params.get('x')) : spine.x0 + 20;
+  const startY = params.has('y') ? parseFloat(params.get('y')) : 0;
+  const yaw = (params.has('yaw') ? parseFloat(params.get('yaw')) : 0) * Math.PI / 180;
+  // Blender heading (cos, sin) maps to three.js (cos, -sin) on the X and Z axes.
+  camera.position.set(startX, EYE_HEIGHT, -startY);
+  camera.lookAt(startX + Math.cos(yaw) * 50, EYE_HEIGHT, -startY - Math.sin(yaw) * 50);
 }).catch(err => {
   document.querySelector('#overlay div').textContent = 'Failed to load: ' + err;
 });
