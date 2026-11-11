@@ -66,7 +66,34 @@ MAT = {
     "awn_teal":  make_mat("AwningTeal", (0.20, 0.50, 0.50), rough=0.8),
     "hall_lit":  make_mat("HallFront", (1.0, 0.70, 0.40), rough=0.5, emit=0.5),
     "tower_win": make_mat("TowerWindow", (0.70, 0.85, 1.0), rough=0.3, emit=1.5),
+    "poi":       make_mat("PoiSign",   (1.0, 0.82, 0.25), rough=0.4, emit=0.8),
 }
+
+# Points of interest. "hall" is the index of the market hall (0 = aft end, hall spacing 60 m).
+# Text is paraphrased from the lore files named in "source".
+POIS = [
+    {"name": "Harbour Care Complex", "hall": 0, "side": "port",
+     "text": "Buildings at the aft end of the Spine with about 500 staff: nurses, carers, "
+             "physiotherapists and social workers. Palliative patients can see the Spine's skylights.",
+     "source": "lore/elder_care_and_end_of_life.md"},
+    {"name": "Shift-Change Hall", "hall": 4, "side": "stbd",
+     "text": "A large communal room next to the rail station. Rows of terminals and a queue desk, "
+             "where batch clerks handle residents' messages. Busiest at shift changes.",
+     "source": "lore/batch_clerks_message_runners.md"},
+    {"name": "Spine Theatre", "hall": 11, "side": "stbd",
+     "text": "On the Spine's central concourse. Seats about 1,200 people for plays, concerts and dance, "
+             "with performers drawn from residents.",
+     "source": "lore/arts_media_and_entertainment.md"},
+    {"name": "Harbour Hall", "hall": 16, "side": "port",
+     "text": "A market for port goods and imports, including clothing and fabric. About 60 tailors and "
+             "seamstresses work here and in the terrace community rooms. The Landfall Festival market is held here.",
+     "source": "lore/clothing_textiles_and_laundry.md"},
+    {"name": "Commissary Canteen", "hall": 20, "side": "stbd",
+     "text": "Part of the Commissary, which runs about 60 kitchens and canteens across the terraces "
+             "and the Spine. Each adult receives a meal allowance on their ledger account.",
+     "source": "lore/food_and_agriculture.md"},
+]
+
 AWNINGS = [MAT["awn_red"], MAT["awn_cream"], MAT["awn_teal"]]
 
 colliders = []
@@ -148,8 +175,8 @@ while x + HALL_LEN <= SPINE_X1 - 20.0:
     box(f"Hall_Stbd_{hall_index}", x0, x1, HALL_INNER, HALL_OUTER, 0, height, MAT["hall"], collide=True)
 
     awning = AWNINGS[hall_index % len(AWNINGS)]
-    box(f"Awning_Port_{hall_index}", x0, x1, -HALL_INNER, -8.5, 3.0, 3.4, awning)
-    box(f"Awning_Stbd_{hall_index}", x0, x1, 8.5, HALL_INNER, 3.0, 3.4, awning)
+    box(f"Awning_Port_{hall_index}", x0, x1, -HALL_INNER, -9.0, 3.0, 3.4, awning)
+    box(f"Awning_Stbd_{hall_index}", x0, x1, 9.0, HALL_INNER, 3.0, 3.4, awning)
 
     box(f"HallFront_Port_{hall_index}", x0 + 3, x1 - 3, -HALL_INNER - 0.08, -HALL_INNER + 0.02, 1.0,
         height - 1.5, MAT["hall_lit"])
@@ -158,6 +185,21 @@ while x + HALL_LEN <= SPINE_X1 - 20.0:
 
     hall_index += 1
     x += HALL_LEN + HALL_GAP
+
+# Point-of-interest signs on the hall fronts (yellow boards, facing the aisle)
+poi_records = []
+for poi in POIS:
+    x0 = SPINE_X0 + 20.0 + poi["hall"] * (HALL_LEN + HALL_GAP)
+    x1 = x0 + HALL_LEN
+    cx = (x0 + x1) / 2
+    if poi["side"] == "port":
+        y = -7.0
+        box(f"Sign_{poi['hall']}", x0 + 8, x1 - 8, -10.98, -10.86, 4.0, 5.0, MAT["poi"])
+    else:
+        y = 7.0
+        box(f"Sign_{poi['hall']}", x0 + 8, x1 - 8, 10.86, 10.98, 4.0, 5.0, MAT["poi"])
+    poi_records.append({"name": poi["name"], "text": poi["text"], "source": poi["source"],
+                        "x": cx, "y": y})
 
 # Planters with trees in the gaps between halls
 planter_index = 0
@@ -191,6 +233,7 @@ with open(json_path, "w") as f:
     json.dump({
         "bounds": {"min": [SPINE_X0, -SPINE_HALF_WIDTH], "max": [SPINE_X1, SPINE_HALF_WIDTH]},
         "spine": {"x0": SPINE_X0, "x1": SPINE_X1, "length": SPINE_X1 - SPINE_X0},
+        "pois": poi_records,
         "colliders": colliders,
     }, f, indent=2)
 

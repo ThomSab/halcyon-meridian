@@ -14,6 +14,43 @@
     "x1": 1500.0,
     "length": 1400.0
   },
+  "pois": [
+    {
+      "name": "Harbour Care Complex",
+      "text": "Buildings at the aft end of the Spine with about 500 staff: nurses, carers, physiotherapists and social workers. Palliative patients can see the Spine's skylights.",
+      "source": "lore/elder_care_and_end_of_life.md",
+      "x": 140.0,
+      "y": -7.0
+    },
+    {
+      "name": "Shift-Change Hall",
+      "text": "A large communal room next to the rail station. Rows of terminals and a queue desk, where batch clerks handle residents' messages. Busiest at shift changes.",
+      "source": "lore/batch_clerks_message_runners.md",
+      "x": 380.0,
+      "y": 7.0
+    },
+    {
+      "name": "Spine Theatre",
+      "text": "On the Spine's central concourse. Seats about 1,200 people for plays, concerts and dance, with performers drawn from residents.",
+      "source": "lore/arts_media_and_entertainment.md",
+      "x": 800.0,
+      "y": 7.0
+    },
+    {
+      "name": "Harbour Hall",
+      "text": "A market for port goods and imports, including clothing and fabric. About 60 tailors and seamstresses work here and in the terrace community rooms. The Landfall Festival market is held here.",
+      "source": "lore/clothing_textiles_and_laundry.md",
+      "x": 1100.0,
+      "y": -7.0
+    },
+    {
+      "name": "Commissary Canteen",
+      "text": "Part of the Commissary, which runs about 60 kitchens and canteens across the terraces and the Spine. Each adult receives a meal allowance on their ledger account.",
+      "source": "lore/food_and_agriculture.md",
+      "x": 1340.0,
+      "y": 7.0
+    }
+  ],
   "colliders": [
     {
       "type": "box",

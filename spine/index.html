@@ -16,6 +16,19 @@
     position: absolute; top: 10px; left: 10px; color: #fff; font-size: 13px;
     background: rgba(0, 0, 0, 0.5); padding: 6px 10px; border-radius: 4px; pointer-events: none;
   }
+  #prompt {
+    position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); color: #fff;
+    font-size: 15px; background: rgba(0, 0, 0, 0.6); padding: 6px 12px; border-radius: 4px;
+    pointer-events: none; display: none;
+  }
+  #panel {
+    position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); width: min(640px, 90%);
+    color: #fff; background: rgba(0, 0, 0, 0.75); padding: 12px 16px; border-radius: 6px;
+    line-height: 1.5; display: none; pointer-events: none;
+  }
+  #panel h3 { margin: 0 0 6px 0; font-size: 17px; color: #ffd66b; }
+  #panel p { margin: 0 0 6px 0; font-size: 14px; }
+  #panel small { color: #aab; font-size: 11px; }
 </style>
 <script type="importmap">
 {
@@ -29,6 +42,8 @@
 <body>
 <div id="overlay"><div>Click to start<br><small>WASD / arrows to walk, Shift to run, mouse to look, Esc to release</small></div></div>
 <div id="hud">The Spine - Halcyon Meridian</div>
+<div id="prompt"></div>
+<div id="panel"><h3 id="ptitle"></h3><p id="ptext"></p><small id="psource"></small></div>
 
 <script type="module">
 import * as THREE from 'three';
@@ -66,7 +81,10 @@ controls.addEventListener('lock', () => overlay.classList.add('hidden'));
 controls.addEventListener('unlock', () => overlay.classList.remove('hidden'));
 
 const keys = {};
-document.addEventListener('keydown', e => { keys[e.code] = true; });
+document.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'KeyE' && !e.repeat) togglePoi();
+});
 document.addEventListener('keyup', e => { keys[e.code] = false; });
 
 // --- Collision data (Blender coordinates: bx = x, by = -three.z) -------------
@@ -142,6 +160,50 @@ function updateHud() {
   hud.textContent = `The Spine - Halcyon Meridian | ${along} m along the Spine (of ${spine.length.toFixed(0)} m)`;
 }
 
+// --- Points of interest -------------------------------------------------------
+const POI_RANGE = 5.0;   // metres
+const prompt = document.getElementById('prompt');
+const panel = document.getElementById('panel');
+const panelTitle = document.getElementById('ptitle');
+const panelText = document.getElementById('ptext');
+const panelSource = document.getElementById('psource');
+let pois = [];
+let nearPoi = null;
+let openPoi = null;
+
+function openPanel(poi) {
+  openPoi = poi;
+  panelTitle.textContent = poi.name;
+  panelText.textContent = poi.text;
+  panelSource.textContent = 'Source: ' + poi.source;
+  panel.style.display = 'block';
+}
+
+function closePanel() {
+  openPoi = null;
+  panel.style.display = 'none';
+}
+
+function togglePoi() {
+  if (!controls.isLocked) return;
+  if (openPoi) { closePanel(); return; }
+  if (nearPoi) openPanel(nearPoi);
+}
+
+function updatePois() {
+  const bx = camera.position.x;
+  const by = -camera.position.z;
+  let best = null, bestDist = Infinity;
+  for (const p of pois) {
+    const d = Math.hypot(p.x - bx, p.y - by);
+    if (d < bestDist) { bestDist = d; best = p; }
+  }
+  nearPoi = bestDist <= POI_RANGE ? best : null;
+  prompt.style.display = (nearPoi && !openPoi) ? 'block' : 'none';
+  if (nearPoi) prompt.textContent = `[E] ${nearPoi.name}`;
+  if (openPoi && (!nearPoi || nearPoi !== openPoi)) closePanel();
+}
+
 // --- Load model and collision data -------------------------------------------
 const loader = new GLTFLoader();
 const modelReady = new Promise((resolve, reject) =>
@@ -152,6 +214,7 @@ const collisionReady = fetch('spine_colliders.json')
     bounds = data.bounds;
     colliders = data.colliders;
     spine = data.spine;
+    pois = data.pois || [];
   });
 
 // Optional URL parameters, mainly for screenshots:
@@ -168,6 +231,10 @@ Promise.all([modelReady, collisionReady]).then(() => {
   // Blender heading (cos, sin) maps to three.js (cos, -sin) on the X and Z axes.
   camera.position.set(startX, EYE_HEIGHT, -startY);
   camera.lookAt(startX + Math.cos(yaw) * 50, EYE_HEIGHT, -startY - Math.sin(yaw) * 50);
+  //   ?open=N           open the text panel for point of interest N (screenshots)
+  if (params.has('open') && pois[parseInt(params.get('open'), 10)]) {
+    openPanel(pois[parseInt(params.get('open'), 10)]);
+  }
 }).catch(err => {
   document.querySelector('#overlay div').textContent = 'Failed to load: ' + err;
 });
@@ -179,6 +246,7 @@ function animate(timestamp) {
   timer.update(timestamp);
   updateMovement(Math.min(timer.getDelta(), 0.05));
   updateHud();
+  updatePois();
   renderer.render(scene, camera);
 }
 animate();
