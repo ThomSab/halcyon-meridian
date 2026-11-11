@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Halcyon Meridian - Engine Room</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; }
+  #overlay {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(0, 0, 0, 0.55); color: #fff; cursor: pointer; text-align: center;
+  }
+  #overlay.hidden { display: none; }
+  #overlay div { background: rgba(0, 0, 0, 0.6); padding: 16px 24px; border-radius: 6px; line-height: 1.6; }
+  #hud {
+    position: absolute; top: 10px; left: 10px; color: #fff; font-size: 13px;
+    background: rgba(0, 0, 0, 0.5); padding: 6px 10px; border-radius: 4px; pointer-events: none;
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "../node_modules/three/build/three.module.js",
+    "three/addons/": "../node_modules/three/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="overlay"><div>Click to start<br><small>WASD / arrows to move, Shift to run, mouse to look, Esc to release</small></div></div>
+<div id="hud">Engine Room - Halcyon Meridian</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+const PLAYER_RADIUS = 0.35;
+const EYE_HEIGHT = 1.7;
+const WALK_SPEED = 3.0;   // m/s
+const RUN_SPEED = 6.0;    // m/s
+
+// --- Renderer, scene, camera --------------------------------------------------
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05070a);
+scene.fog = new THREE.Fog(0x05070a, 60, 160);
+
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.05, 500);
+
+// --- Lighting -----------------------------------------------------------------
+scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x202020, 1.0));
+scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+for (let x = 10; x <= 110; x += 20) {
+  const light = new THREE.PointLight(0xfff1d6, 350, 40, 2);
+  light.position.set(x, 12, 0);   // Blender (x, y, z) -> three (x, z, -y)
+  scene.add(light);
+}
+
+// --- Controls -----------------------------------------------------------------
+const controls = new PointerLockControls(camera, renderer.domElement);
+const overlay = document.getElementById('overlay');
+overlay.addEventListener('click', () => controls.lock());
+controls.addEventListener('lock', () => overlay.classList.add('hidden'));
+controls.addEventListener('unlock', () => overlay.classList.remove('hidden'));
+
+const keys = {};
+document.addEventListener('keydown', e => { keys[e.code] = true; });
+document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+// --- Collision data (Blender coordinates: bx = x, by = -three.z) -------------
+let bounds = { min: [0, -20], max: [120, 20] };
+let colliders = [];
+
+function blocked(bx, by) {
+  if (bx < bounds.min[0] + PLAYER_RADIUS || bx > bounds.max[0] - PLAYER_RADIUS) return true;
+  if (by < bounds.min[1] + PLAYER_RADIUS || by > bounds.max[1] - PLAYER_RADIUS) return true;
+  for (const c of colliders) {
+    if (c.type === 'box') {
+      if (bx > c.min[0] - PLAYER_RADIUS && bx < c.max[0] + PLAYER_RADIUS &&
+          by > c.min[1] - PLAYER_RADIUS && by < c.max[1] + PLAYER_RADIUS) return true;
+    } else if (c.type === 'circle') {
+      const dx = bx - c.center[0], dy = by - c.center[1];
+      const r = c.radius + PLAYER_RADIUS;
+      if (dx * dx + dy * dy < r * r) return true;
+    }
+  }
+  return false;
+}
+
+// --- Movement with wall sliding ----------------------------------------------
+const forward = new THREE.Vector3();
+const right = new THREE.Vector3();
+const UP = new THREE.Vector3(0, 1, 0);
+
+function updateMovement(dt) {
+  if (!controls.isLocked) return;
+
+  camera.getWorldDirection(forward);
+  forward.y = 0;
+  forward.normalize();
+  right.crossVectors(forward, UP).normalize();
+
+  let f = 0, r = 0;
+  if (keys['KeyW'] || keys['ArrowUp']) f += 1;
+  if (keys['KeyS'] || keys['ArrowDown']) f -= 1;
+  if (keys['KeyD'] || keys['ArrowRight']) r += 1;
+  if (keys['KeyA'] || keys['ArrowLeft']) r -= 1;
+  if (f === 0 && r === 0) return;
+
+  const speed = (keys['ShiftLeft'] || keys['ShiftRight'] ? RUN_SPEED : WALK_SPEED) * dt;
+  const dx = (forward.x * f + right.x * r);
+  const dz = (forward.z * f + right.z * r);
+  const len = Math.hypot(dx, dz);
+  const mx = (dx / len) * speed;
+  const mz = (dz / len) * speed;
+
+  // Convert to Blender coords: bx = three.x, by = -three.z
+  const bx = camera.position.x;
+  const by = -camera.position.z;
+
+  let nx = bx, ny = by;
+  if (!blocked(bx + mx, by + mz)) {
+    nx = bx + mx; ny = by + mz;
+  } else if (!blocked(bx + mx, by)) {
+    nx = bx + mx;
+  } else if (!blocked(bx, by + mz)) {
+    ny = by + mz;
+  }
+
+  camera.position.x = nx;
+  camera.position.z = -ny;
+}
+
+// --- Load model and collision data -------------------------------------------
+const loader = new GLTFLoader();
+const modelReady = new Promise((resolve, reject) =>
+  loader.load('engine_room.glb', gltf => { scene.add(gltf.scene); resolve(); }, undefined, reject));
+const collisionReady = fetch('engine_room_colliders.json')
+  .then(r => r.json())
+  .then(data => { bounds = data.bounds; colliders = data.colliders; });
+
+Promise.all([modelReady, collisionReady]).then(() => {
+  // Start in the port aisle (Blender y = -12, which is three z = +12), clear of the reactors.
+  // Looking fore along +X.
+  camera.position.set(20, EYE_HEIGHT, 12);
+  camera.lookAt(60, EYE_HEIGHT, 12);
+}).catch(err => {
+  document.querySelector('#overlay div').textContent = 'Failed to load model: ' + err;
+});
+
+// --- Loop ---------------------------------------------------------------------
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  updateMovement(Math.min(clock.getDelta(), 0.05));
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>

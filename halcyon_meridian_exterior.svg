@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 600" width="1600" height="600">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8fc1e3"/>
+      <stop offset="1" stop-color="#e9f3f8"/>
+    </linearGradient>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2d7097"/>
+      <stop offset="1" stop-color="#0f3248"/>
+    </linearGradient>
+    <pattern id="waves" width="120" height="24" patternUnits="userSpaceOnUse">
+      <path d="M0 12 Q30 2 60 12 T120 12" fill="none" stroke="#8cc3de" stroke-width="2"/>
+    </pattern>
+    <pattern id="win" width="22" height="18" patternUnits="userSpaceOnUse">
+      <rect width="22" height="18" fill="#dfe9ef"/>
+      <rect x="3" y="4" width="16" height="10" fill="#7fb0cc"/>
+    </pattern>
+  </defs>
+
+  <!-- sky and sea -->
+  <rect width="1600" height="600" fill="url(#sky)"/>
+  <rect y="440" width="1600" height="160" fill="url(#sea)"/>
+  <rect y="446" width="1600" height="60" fill="url(#waves)" opacity="0.6"/>
+
+  <!-- hull -->
+  <path d="M0 440 Q60 400 160 350 L1440 350 Q1540 395 1600 440 Q1560 500 1480 524 L120 524 Q40 510 0 440 Z" fill="#56656f" stroke="#1d2a33" stroke-width="3"/>
+  <path d="M8 440 L1592 440" stroke="#b5452f" stroke-width="5"/>
+  <rect x="160" y="350" width="1280" height="8" fill="#3c4a52"/>
+
+  <!-- midships solarium band -->
+  <rect x="420" y="296" width="730" height="54" fill="#cfe7d6" stroke="#2f3d36" stroke-width="2"/>
+
+  <!-- forward residential tower with setbacks and bridge -->
+  <rect x="180" y="250" width="240" height="100" fill="url(#win)" stroke="#2f3d36" stroke-width="2"/>
+  <rect x="200" y="190" width="200" height="60" fill="url(#win)" stroke="#2f3d36" stroke-width="2"/>
+  <rect x="230" y="140" width="140" height="50" fill="url(#win)" stroke="#2f3d36" stroke-width="2"/>
+  <rect x="260" y="120" width="80" height="22" fill="#2a3a46"/>
+  <rect x="266" y="126" width="68" height="8" fill="#9fd3ef"/>
+
+  <!-- aft residential tower with setbacks -->
+  <rect x="1150" y="250" width="270" height="100" fill="url(#win)" stroke="#2f3d36" stroke-width="2"/>
+  <rect x="1180" y="190" width="210" height="60" fill="url(#win)" stroke="#2f3d36" stroke-width="2"/>
+  <rect x="1210" y="140" width="150" height="50" fill="url(#win)" stroke="#2f3d36" stroke-width="2"/>
+
+  <!-- 18 wingsail masts shown in this view (the full ship carries 36 in two rows) -->
+  <rect x="253" y="130" width="14" height="220" rx="7" fill="#f3efe4" stroke="#4a4a44" stroke-width="1.5"/>
+  <rect x="316.5" y="130" width="14" height="220" rx="7" fill="#f3efe4" stroke="#4a4a44" stroke-width="1.5"/>
+  <rect x="380" y="130" width="14" height="220" rx="7" fill="#f3efe4" stroke="#4a4a44" stroke-width="1.5"/>
+  <rect x="443.5" y="130" width="14" height="220" rx="7" fill="#f3efe4" stroke="#4a4a44" stroke-width="1.5"/>
+  <rect x="507" y="130" width="14" height="220" rx="7" fill="#f3efe4" stroke="#4a4a44" stroke-width="1.5"/>
+  <rect x="570.5" y="130" width="14" height="220" rx="7" fill="#f3efe4" stroke="#4a4a44" stroke-width="1.5"/>
+  <rect x="634" y="130" width="14" height="220" rx="7" fill="#f3efe4" stroke="#4a4a44" stroke-width="1.5"/>
+  <rect x="697.5" y="130" width="14" height="220" rx="7" fill="#f3efe4" stroke="#4a4a44" stroke-width="1.5"/>
+  <rect x="761" y="130" width="14" height="220" rx="7" fill="#f3efe4" stroke="#4a4a44" stroke-width="1.5"/>
+  <rect x="824.5" y="130" width="14" height="220" rx="7" fill="#f3efe4" stroke="#4a4a44" stroke-width="1.5"/>
+  <rect x="888" y="130" width="14" height="220" rx="7" fill="#f3efe4" stroke="#4a4a44" stroke-width="1.5"/>
+  <rect x="951.5" y="130" width="14" height="220" rx="7" fill="#f3efe4" stroke="#4a4a44" stroke-width="1.5"/>
+  <rect x="1015" y="130" width="14" height="220" rx="7" fill="#f3efe4" stroke="#4a4a44" stroke-width="1.5"/>
+  <rect x="1078.5" y="130" width="14" height="220" rx="7" fill="#f3efe4" stroke="#4a4a44" stroke-width="1.5"/>
+  <rect x="1142" y="130" width="14" height="220" rx="7" fill="#f3efe4" stroke="#4a4a44" stroke-width="1.5"/>
+  <rect x="1205.5" y="130" width="14" height="220" rx="7" fill="#f3efe4" stroke="#4a4a44" stroke-width="1.5"/>
+  <rect x="1269" y="130" width="14" height="220" rx="7" fill="#f3efe4" stroke="#4a4a44" stroke-width="1.5"/>
+  <rect x="1332.5" y="130" width="14" height="220" rx="7" fill="#f3efe4" stroke="#4a4a44" stroke-width="1.5"/>
+
+  <!-- labels -->
+  <text x="30" y="40" font-family="Segoe UI, Arial, sans-serif" font-size="26" fill="#0d2a3a">Halcyon Meridian: side elevation (illustrative)</text>
+  <text x="30" y="68" font-family="Segoe UI, Arial, sans-serif" font-size="16" fill="#0d2a3a">Length 1,600 m, beam 320 m. Masts rise about 155 m above the waterline. Vertical scale exaggerated about 2x.</text>
+  <text x="800" y="584" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="16" fill="#e6f2f8">Red line marks the waterline. Not to scale for the sea surface.</text>
+</svg>

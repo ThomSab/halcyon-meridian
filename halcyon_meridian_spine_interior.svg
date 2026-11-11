@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
+  <defs>
+    <linearGradient id="floor" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#7d7568"/>
+      <stop offset="1" stop-color="#a39b8c"/>
+    </linearGradient>
+  </defs>
+
+  <!-- background -->
+  <rect width="1600" height="900" fill="#dfe6e8"/>
+
+  <!-- ceiling -->
+  <polygon points="0,0 1600,0 980,300 620,300" fill="#f2f4f5"/>
+
+  <!-- skylight strips in ceiling (daylight from Solarium deck) -->
+  <polygon points="740,0 860,0 830,300 770,300" fill="#fffbe8"/>
+  <polygon points="380,0 430,0 655,300 630,300" fill="#fffbe8" opacity="0.9"/>
+  <polygon points="1170,0 1220,0 970,300 945,300" fill="#fffbe8" opacity="0.9"/>
+
+  <!-- left wall (market halls) -->
+  <polygon points="0,0 620,300 620,560 0,900" fill="#d9cdb8"/>
+  <!-- right wall (terrace gardens and balconies) -->
+  <polygon points="1600,0 980,300 980,560 1600,900" fill="#cfd9c9"/>
+
+  <!-- far end wall -->
+  <rect x="620" y="300" width="360" height="260" fill="#e9e4d8"/>
+
+  <!-- floor -->
+  <polygon points="0,900 1600,900 980,560 620,560" fill="url(#floor)"/>
+
+  <!-- market stalls on left wall -->
+  <polygon points="40,430 200,360 200,520 40,600" fill="#c8553d"/>
+  <polygon points="220,370 360,330 360,470 220,520" fill="#4f7f5f"/>
+  <polygon points="380,340 500,315 500,430 380,470" fill="#3c6e91"/>
+  <polygon points="520,320 610,305 610,400 520,430" fill="#d19a3a"/>
+
+  <!-- terrace gardens and balcony rails on right wall -->
+  <polygon points="1560,80 1420,150 1420,260 1560,200" fill="#5f9e5a"/>
+  <polygon points="1400,170 1200,255 1200,335 1400,260" fill="#7fb36f"/>
+  <polygon points="1190,300 1020,350 1020,410 1190,360" fill="#5f9e5a"/>
+  <line x1="1600" y1="230" x2="980" y2="400" stroke="#6b7a6b" stroke-width="4"/>
+
+  <!-- rail tracks along the Spine -->
+  <line x1="740" y1="560" x2="560" y2="900" stroke="#4d4d4d" stroke-width="7"/>
+  <line x1="860" y1="560" x2="1040" y2="900" stroke="#4d4d4d" stroke-width="7"/>
+
+  <!-- train in the distance -->
+  <rect x="780" y="495" width="40" height="45" rx="6" fill="#2b5c8a"/>
+  <rect x="786" y="502" width="28" height="12" fill="#bfe0f2"/>
+
+  <!-- ceiling lights -->
+  <circle cx="800" cy="40" r="6" fill="#fff8d0"/>
+  <circle cx="700" cy="110" r="5" fill="#fff8d0"/>
+  <circle cx="900" cy="110" r="5" fill="#fff8d0"/>
+  <circle cx="800" cy="200" r="4" fill="#fff8d0"/>
+
+  <!-- people for scale -->
+  <circle cx="260" cy="752" r="12" fill="#3b3b3b"/>
+  <rect x="246" y="766" width="28" height="60" rx="10" fill="#3b3b3b"/>
+  <circle cx="420" cy="800" r="14" fill="#3b3b3b"/>
+  <rect x="404" y="816" width="32" height="70" rx="11" fill="#3b3b3b"/>
+  <circle cx="1240" cy="780" r="12" fill="#3b3b3b"/>
+  <rect x="1226" y="794" width="28" height="60" rx="10" fill="#3b3b3b"/>
+
+  <!-- labels -->
+  <text x="30" y="46" font-family="Segoe UI, Arial, sans-serif" font-size="26" fill="#1d2b33">The Spine, Deck 9, looking aft (illustrative)</text>
+  <text x="30" y="74" font-family="Segoe UI, Arial, sans-serif" font-size="16" fill="#1d2b33">About 40 m wide and 1.5 km long. Market halls on the left, cafés and community halls with planters on the right, rail track down the centre.</text>
+</svg>
