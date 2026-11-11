@@ -70,6 +70,8 @@ BENCH = mat("Bench", (0.45, 0.32, 0.20), rough=0.7)
 STEEL = mat("Steel", (0.45, 0.46, 0.48), rough=0.4, metal=0.7)
 CONSOLE = mat("Console", (0.20, 0.24, 0.30), rough=0.4)
 CABIN_WOOD = mat("CabinWood", (0.55, 0.40, 0.28), rough=0.7)
+LIFT_STEEL = mat("LiftSteel", (0.35, 0.37, 0.40), rough=0.4, metal=0.6)
+LIFT_LIGHT = mat("LiftLight", (0.50, 0.80, 0.90), rough=0.3, emit=0.6)
 
 
 class Room:
@@ -110,6 +112,12 @@ class Room:
         """A post with a collider (used for trees and posts)."""
         self.box(name, x - radius, x + radius, y - radius, y + radius, 0, height, m, collide=True)
 
+    def elevator(self, ex):
+        """A lift cabin against the south wall at local x = ex. Arrive in front of it."""
+        self.box("ElevatorCabin", ex - 1.2, ex + 1.2, 0.0, 1.3, 0, 2.6, LIFT_STEEL, collide=True)
+        self.box("ElevatorDoor", ex - 1.0, ex + 1.0, 1.3, 1.36, 0.15, 2.45, LIFT_LIGHT)
+        self.box("ElevatorSign", ex - 0.8, ex + 0.8, 1.3, 1.36, 2.5, 2.8, LIFT_LIGHT)
+
     # -- shell -------------------------------------------------------------------
     def shell(self):
         W, D, H = self.w, self.d, self.h
@@ -148,7 +156,8 @@ class Room:
         }
         if self.exit:
             ex, ey, label, target = self.exit
-            out["exit"] = {"x": ox + ex, "y": oy + ey, "label": label, "target": target}
+            out["exit"] = {"x": ox + ex, "y": oy + ey, "label": label, "target": target,
+                           "face": [ox + ex, oy + 0.6]}   # the elevator cabin sits on the south wall
         if self.hall is not None:
             out["hall"] = self.hall
             out["side"] = self.side
@@ -174,8 +183,9 @@ for i, x in enumerate([30, 60, 90, 120]):
 r.trunk("Capstan_1", 40, 30, 1.2, 1.1, STEEL)
 r.trunk("Capstan_2", 110, 30, 1.2, 1.1, STEEL)
 r.box("MastStub", 74, 76, 28, 32, 0, 12, STEEL, collide=True)
-r.spawn = (12, 30)
-r.exit = (10, 30, "Lift to the Spine", "lift:Port")
+r.elevator(12)
+r.spawn = (12, 4.0)
+r.exit = (12, 3.0, "Use the elevator", "menu")
 r.lift = True
 ZONES.append(r)
 
@@ -190,8 +200,9 @@ for i in range(6):
         r.box(f"Canopy_{i}_{j}", tx - 1.6, tx + 1.6, ty - 1.6, ty + 1.6, 2.8, 4.6, FOLIAGE)
 for i, x in enumerate([60, 120, 150]):
     r.box(f"Bench_{i}", x, x + 2.2, 100, 100.6, 0, 0.5, BENCH, collide=True)
-r.spawn = (10, 60)
-r.exit = (8, 60, "Lift to the Spine", "lift:Port")
+r.elevator(10)
+r.spawn = (10, 4.0)
+r.exit = (10, 3.0, "Use the elevator", "menu")
 r.lift = True
 ZONES.append(r)
 
@@ -201,8 +212,9 @@ r.shell()
 r.box("Windows", 2, 38, 19.85, 19.97, 2.4, 5.0, WINDOW)
 r.box("Console", 6, 34, 13, 15.5, 0, 1.2, CONSOLE, collide=True)
 r.box("CaptainChair", 19, 21, 16.5, 17.5, 0, 1.0, SEAT, collide=True)
-r.spawn = (20, 4)
-r.exit = (20, 2.6, "Lift to the Spine", "lift:Port")
+r.elevator(20)
+r.spawn = (20, 4.0)
+r.exit = (20, 3.0, "Use the elevator", "menu")
 r.lift = True
 ZONES.append(r)
 
@@ -212,8 +224,9 @@ r.shell()
 for i, y in enumerate([6, 12, 18, 24]):
     r.box(f"Planter_{i}", 8, 72, y - 0.9, y + 0.9, 0, 0.9, PLANTER, collide=True)
     r.box(f"Plants_{i}", 8, 72, y - 0.7, y + 0.7, 0.9, 1.6, FOLIAGE)
-r.spawn = (3, 15)
-r.exit = (4.5, 15, "Lift to the Spine", "lift:Port")
+r.elevator(4)
+r.spawn = (4, 4.0)
+r.exit = (4, 3.0, "Use the elevator", "menu")
 r.lift = True
 ZONES.append(r)
 
@@ -225,8 +238,9 @@ for i, x in enumerate([6, 12, 18, 24]):
         r.box(f"Desk_{i}_{j}", x, x + 2.4, y, y + 1.0, 0, 0.8, DESK, collide=True)
 r.box("TeacherDesk", 13.5, 16.5, 17, 18.2, 0, 0.9, DESK, collide=True)
 r.box("Board", 6, 24, 19.85, 19.97, 1.2, 3.2, BOARD)
-r.spawn = (15, 2.5)
-r.exit = (15, 1.8, "Lift to the Spine", "lift:Port")
+r.elevator(15)
+r.spawn = (15, 4.0)
+r.exit = (15, 3.0, "Use the elevator", "menu")
 r.lift = True
 ZONES.append(r)
 
@@ -237,8 +251,9 @@ r.box("Bed", 6.4, 8.6, 5.2, 6.2, 0, 0.5, BED, collide=True)
 r.box("Table", 1.5, 2.7, 4.6, 5.4, 0, 0.8, CABIN_WOOD, collide=True)
 r.box("Wardrobe", 8.6, 9.4, 0.8, 2.6, 0, 2.2, CABIN_WOOD, collide=True)
 r.box("Window", 2, 4.5, 7.85, 7.97, 1.3, 2.4, WINDOW)
-r.spawn = (5, 2.2)
-r.exit = (5, 1.2, "Lift to the Spine", "lift:Port")
+r.elevator(2.2)
+r.spawn = (2.2, 4.0)
+r.exit = (2.2, 3.0, "Use the elevator", "menu")
 r.lift = True
 ZONES.append(r)
 
@@ -304,6 +319,11 @@ def shift_collider(c):
     return {"type": "circle", "center": [c["center"][0] + EX, c["center"][1] + EY], "radius": c["radius"]}
 
 
+# A lift cabin against the engine room's west wall (x = 0). Added to rooms.glb at world coordinates.
+engine_lift = Room("engine_lift", "", 0.0, 0.0, 1, 1, 1)
+engine_lift.box("EngineElevatorCabin", EX, EX + 1.3, EY - 1.2, EY + 1.2, 0, 2.6, LIFT_STEEL, collide=True)
+engine_lift.box("EngineElevatorDoor", EX + 1.3, EX + 1.36, EY - 1.0, EY + 1.0, 0.15, 2.45, LIFT_LIGHT)
+
 engine_entry = {
     "id": "engine_room",
     "name": "Engine Room",
@@ -311,9 +331,10 @@ engine_entry = {
     "glbOffset": [EX, EY],
     "bounds": {"min": [EX + engine_data["bounds"]["min"][0], EY + engine_data["bounds"]["min"][1]],
                "max": [EX + engine_data["bounds"]["max"][0], EY + engine_data["bounds"]["max"][1]]},
-    "colliders": [shift_collider(c) for c in engine_data["colliders"]],
-    "spawn": [EX + 2.0, EY - 1.5],
-    "exit": {"x": EX + 2.0, "y": EY + 0.0, "label": "Lift to the Spine", "target": "lift:Port"},
+    "colliders": [shift_collider(c) for c in engine_data["colliders"]] + engine_lift.colliders,
+    "spawn": [EX + 4.0, EY],
+    "exit": {"x": EX + 3.2, "y": EY, "label": "Use the elevator", "target": "menu",
+             "face": [EX + 0.65, EY]},   # the cabin sits on the west wall
     "lift": True,
 }
 

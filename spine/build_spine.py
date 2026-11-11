@@ -277,6 +277,10 @@ for i in range(TRAIN_CARS):
     for part in (body, windows, roof):
         part.parent = train_root
 
+# --- Aft elevator: where the player spawns, in the gap between the aft tower and hall 0 ---
+box("Lift_Aft", 104.0, 116.0, -19.0, -11.0, 0, 4.2, MAT["pole"], collide=True)
+box("LiftDoor_Aft", 106.4, 113.6, -11.12, -10.9, 0.4, 3.6, MAT["poi"])
+lifts.append({"name": "Lift Aft", "x": 110.0, "y": -15.0, "stance": [110.0, -9.0]})
 # --- Export ---------------------------------------------------------------------
 glb_path = os.path.join(OUT_DIR, "spine.glb")
 bpy.ops.export_scene.gltf(filepath=glb_path, export_format="GLB")

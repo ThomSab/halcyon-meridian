@@ -35,7 +35,8 @@ Run the server from the repo root so `node_modules/three` resolves. Dependencies
 `world/index.html` is the main game: one page that holds every walkable zone.
 
 - **Zones:** The Spine (the hub), the Engine Room, Bow Deck, Solarium Park, Bridge, Greenhouse, Classroom, Residential Cabin, and five rooms behind the market-hall doors (Harbour Hall, Commissary Canteen, Spine Theatre, Shift-Change Hall, Harbour Care Ward).
-- **Getting around:** Use a lift on the Spine (E, at the lift shafts in the gaps between halls) to pick a level from the menu. Use a hall door (E) to go inside. Every room has an exit prompt that takes you back.
+- **Getting around:** You start beside the aft elevator at the aft end of the Spine. Two more elevators sit in the gaps between halls. Press E at an elevator to pick a level from the menu. Use a hall door (E) to go inside.
+- **Elevators in rooms:** every room (and the engine room) has a visible elevator cabin where you arrive. Press E at it to open the level menu; The Spine is the first option, so you can always go back.
 - **Transitions:** Zones are separate spaces joined by a short fade, not walked through continuously. The bow, the engine room, and the other decks are not physically connected to the Spine.
 - **What carries over:** NPCs (Spine only), knocks on doors, signs, the train, the journal, and the lore discovery.
 

@@ -247,6 +247,15 @@ function updateMovement(dt) {
   camera.position.z = -ny;
 }
 
+// On arrival, face the elevator if the zone has one (so the cabin is in view), otherwise fore.
+function faceArrival(zone, x, y) {
+  if (zone.exit && zone.exit.face) {
+    camera.lookAt(zone.exit.face[0], EYE_HEIGHT, -zone.exit.face[1]);
+  } else {
+    camera.lookAt(x + 50, EYE_HEIGHT, -y);
+  }
+}
+
 // Move the player to another zone, with a short fade. Spawn coordinates are world coordinates.
 let travelling = false;
 function travel(zoneId, [x, y]) {
@@ -256,6 +265,7 @@ function travel(zoneId, [x, y]) {
   setTimeout(() => {
     activeZone = zones[zoneId];
     camera.position.set(x, EYE_HEIGHT, -y);
+    faceArrival(activeZone, x, y);
     nearest = null;
     if (activeZone.isSpine) notice(`Back on the Spine`, 3);
     else notice(activeZone.name, 3, true);
@@ -359,17 +369,25 @@ function openJournal() {
     lines.join('\n\n');
 }
 
+// The elevator menu lists the levels. From inside a room, The Spine (the aft elevator) is first.
 function openLiftMenu() {
-  openPanel('Lift - choose a level');
+  openPanel('Elevator - choose a level');
   panelText.textContent = '';
+  const options = [];
+  if (activeZone && !activeZone.isSpine) {
+    options.push({ name: 'The Spine (ground level)', spawn: spineZone.spawn, zone: 'spine' });
+  }
   for (const z of Object.values(zones)) {
-    if (!z.lift) continue;
+    if (!z.lift || (activeZone && z.id === activeZone.id)) continue;
+    options.push({ name: z.name, spawn: z.spawn, zone: z.id });
+  }
+  for (const o of options) {
     const b = document.createElement('button');
     b.className = 'choice';
-    b.textContent = z.name;
+    b.textContent = o.name;
     b.addEventListener('click', () => {
       closePanel();
-      travel(z.id, z.spawn);
+      travel(o.zone, o.spawn);
     });
     panelText.appendChild(b);
   }
@@ -732,6 +750,7 @@ function bindDoorLights(root) {
 // --- Exits and entrances --------------------------------------------------------
 // Returns the Spine spawn point for an exit target such as "hall:16" or "lift:Port".
 function spineSpawnFor(target, fromZone) {
+  if (target === 'menu') return spineZone.spawn;
   if (target.startsWith('hall:')) {
     const k = parseInt(target.split(':')[1], 10);
     const door = spineDoors.find(d => d.name === `Door_${fromZone.side}_${k}`);
@@ -812,11 +831,13 @@ Promise.all([spineDataReady, zonesDataReady, titlesReady]).then(async ([spineDat
   trainMax = spine.x1 - 30 - trainSpec.length;
   trainX = trainMin;
 
+  // The player spawns on the aft elevator (the lift named "Lift Aft" in the Spine data).
+  const aftLift = spineLifts.find(l => l.name === 'Lift Aft') || spineLifts[0];
   spineZone = {
     id: 'spine', name: 'The Spine', isSpine: true, lift: false,
     bounds: { min: spineData.bounds.min, max: spineData.bounds.max },
     colliders: spineData.colliders,
-    spawn: [spine.x0 + 20, 0],
+    spawn: aftLift ? aftLift.stance : [spine.x0 + 20, 0],
     interactables: [],
   };
   zones.spine = spineZone;
@@ -864,7 +885,7 @@ Promise.all([spineDataReady, zonesDataReady, titlesReady]).then(async ([spineDat
   for (const l of spineLifts) {
     spineZone.interactables.push({
       x: l.stance[0], y: l.stance[1], range: 2.5,
-      label: () => `Use the lift`,
+      label: () => 'Use the elevator',
       use: () => openLiftMenu(),
     });
   }
@@ -881,13 +902,15 @@ Promise.all([spineDataReady, zonesDataReady, titlesReady]).then(async ([spineDat
     });
   }
 
-  // Exit interactables for every room
+  // Exit interactables for every room: an elevator opens the level menu, a hall door goes back out
   for (const z of Object.values(zones)) {
     if (z.isSpine || !z.exit) continue;
     z.interactables.push({
-      x: z.exit.x, y: z.exit.y, range: 2.2,
+      x: z.exit.x, y: z.exit.y, range: 3.0,
       label: () => z.exit.label,
-      use: () => travel('spine', spineSpawnFor(z.exit.target, z)),
+      use: () => (z.exit.target === 'menu'
+        ? openLiftMenu()
+        : travel('spine', spineSpawnFor(z.exit.target, z))),
     });
   }
 
@@ -905,8 +928,8 @@ Promise.all([spineDataReady, zonesDataReady, titlesReady]).then(async ([spineDat
   // Start on the Spine (or wherever ?zone= points)
   const params = new URLSearchParams(location.search);
   activeZone = spineZone;
-  const startX = params.has('x') ? parseFloat(params.get('x')) : spine.x0 + 20;
-  const startY = params.has('y') ? parseFloat(params.get('y')) : 0;
+  const startX = params.has('x') ? parseFloat(params.get('x')) : spineZone.spawn[0];
+  const startY = params.has('y') ? parseFloat(params.get('y')) : spineZone.spawn[1];
   const yaw = (params.has('yaw') ? parseFloat(params.get('yaw')) : 0) * Math.PI / 180;
   camera.position.set(startX, EYE_HEIGHT, -startY);
   camera.lookAt(startX + Math.cos(yaw) * 50, EYE_HEIGHT, -startY - Math.sin(yaw) * 50);
@@ -926,7 +949,7 @@ Promise.all([spineDataReady, zonesDataReady, titlesReady]).then(async ([spineDat
     activeZone = zones[params.get('zone')];
     const s = activeZone.spawn;
     camera.position.set(s[0], EYE_HEIGHT, -s[1]);
-    camera.lookAt(s[0] + 5, EYE_HEIGHT, -s[1]);
+    faceArrival(activeZone, s[0], s[1]);
   }
   if (params.has('open') && pois[parseInt(params.get('open'), 10)]) {
     const p = pois[parseInt(params.get('open'), 10)];

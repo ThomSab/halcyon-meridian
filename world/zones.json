@@ -358,17 +358,32 @@
             2120.0,
             -1009.8
           ]
+        },
+        {
+          "type": "box",
+          "min": [
+            2000.0,
+            -1001.2
+          ],
+          "max": [
+            2001.3,
+            -998.8
+          ]
         }
       ],
       "spawn": [
-        2002.0,
-        -1001.5
+        2004.0,
+        -1000.0
       ],
       "exit": {
-        "x": 2002.0,
+        "x": 2003.2,
         "y": -1000.0,
-        "label": "Lift to the Spine",
-        "target": "lift:Port"
+        "label": "Use the elevator",
+        "target": "menu",
+        "face": [
+          2000.65,
+          -1000.0
+        ]
       },
       "lift": true
     },
@@ -511,18 +526,33 @@
             2416.0,
             -968.0
           ]
+        },
+        {
+          "type": "box",
+          "min": [
+            2350.8,
+            -1000.0
+          ],
+          "max": [
+            2353.2,
+            -998.7
+          ]
         }
       ],
       "spawn": [
         2352.0,
-        -970.0
+        -996.0
       ],
       "lift": true,
       "exit": {
-        "x": 2350.0,
-        "y": -970.0,
-        "label": "Lift to the Spine",
-        "target": "lift:Port"
+        "x": 2352.0,
+        "y": -997.0,
+        "label": "Use the elevator",
+        "target": "menu",
+        "face": [
+          2352.0,
+          -999.4
+        ]
       }
     },
     {
@@ -818,18 +848,33 @@
             2832.2,
             -899.4
           ]
+        },
+        {
+          "type": "box",
+          "min": [
+            2688.8,
+            -1000.0
+          ],
+          "max": [
+            2691.2,
+            -998.7
+          ]
         }
       ],
       "spawn": [
         2690.0,
-        -940.0
+        -996.0
       ],
       "lift": true,
       "exit": {
-        "x": 2688.0,
-        "y": -940.0,
-        "label": "Lift to the Spine",
-        "target": "lift:Port"
+        "x": 2690.0,
+        "y": -997.0,
+        "label": "Use the elevator",
+        "target": "menu",
+        "face": [
+          2690.0,
+          -999.4
+        ]
       }
     },
     {
@@ -916,6 +961,17 @@
             3041.0,
             -982.5
           ]
+        },
+        {
+          "type": "box",
+          "min": [
+            3038.8,
+            -1000.0
+          ],
+          "max": [
+            3041.2,
+            -998.7
+          ]
         }
       ],
       "spawn": [
@@ -925,9 +981,13 @@
       "lift": true,
       "exit": {
         "x": 3040.0,
-        "y": -997.4,
-        "label": "Lift to the Spine",
-        "target": "lift:Port"
+        "y": -997.0,
+        "label": "Use the elevator",
+        "target": "menu",
+        "face": [
+          3040.0,
+          -999.4
+        ]
       }
     },
     {
@@ -1036,18 +1096,33 @@
             2072.0,
             -1215.1
           ]
+        },
+        {
+          "type": "box",
+          "min": [
+            2002.8,
+            -1240.0
+          ],
+          "max": [
+            2005.2,
+            -1238.7
+          ]
         }
       ],
       "spawn": [
-        2003.0,
-        -1225.0
+        2004.0,
+        -1236.0
       ],
       "lift": true,
       "exit": {
-        "x": 2004.5,
-        "y": -1225.0,
-        "label": "Lift to the Spine",
-        "target": "lift:Port"
+        "x": 2004.0,
+        "y": -1237.0,
+        "label": "Use the elevator",
+        "target": "menu",
+        "face": [
+          2004.0,
+          -1239.4
+        ]
       }
     },
     {
@@ -1255,18 +1330,33 @@
             2356.5,
             -1221.8
           ]
+        },
+        {
+          "type": "box",
+          "min": [
+            2353.8,
+            -1240.0
+          ],
+          "max": [
+            2356.2,
+            -1238.7
+          ]
         }
       ],
       "spawn": [
         2355.0,
-        -1237.5
+        -1236.0
       ],
       "lift": true,
       "exit": {
         "x": 2355.0,
-        "y": -1238.2,
-        "label": "Lift to the Spine",
-        "target": "lift:Port"
+        "y": -1237.0,
+        "label": "Use the elevator",
+        "target": "menu",
+        "face": [
+          2355.0,
+          -1239.4
+        ]
       }
     },
     {
@@ -1375,18 +1465,33 @@
             2689.4,
             -1237.4
           ]
+        },
+        {
+          "type": "box",
+          "min": [
+            2681.0,
+            -1240.0
+          ],
+          "max": [
+            2683.4,
+            -1238.7
+          ]
         }
       ],
       "spawn": [
-        2685.0,
-        -1237.8
+        2682.2,
+        -1236.0
       ],
       "lift": true,
       "exit": {
-        "x": 2685.0,
-        "y": -1238.8,
-        "label": "Lift to the Spine",
-        "target": "lift:Port"
+        "x": 2682.2,
+        "y": -1237.0,
+        "label": "Use the elevator",
+        "target": "menu",
+        "face": [
+          2682.2,
+          -1239.4
+        ]
       }
     },
     {
@@ -1539,7 +1644,11 @@
         "x": 3040.0,
         "y": -1239.0,
         "label": "Leave Harbour Hall",
-        "target": "hall:16"
+        "target": "hall:16",
+        "face": [
+          3040.0,
+          -1239.4
+        ]
       },
       "hall": 16,
       "side": "port"
@@ -1683,7 +1792,11 @@
         "x": 2020.0,
         "y": -1479.0,
         "label": "Leave Commissary Canteen",
-        "target": "hall:20"
+        "target": "hall:20",
+        "face": [
+          2020.0,
+          -1479.4
+        ]
       },
       "hall": 20,
       "side": "stbd"
@@ -2344,7 +2457,11 @@
         "x": 2360.0,
         "y": -1479.1,
         "label": "Leave Spine Theatre",
-        "target": "hall:11"
+        "target": "hall:11",
+        "face": [
+          2360.0,
+          -1479.4
+        ]
       },
       "hall": 11,
       "side": "stbd"
@@ -2521,7 +2638,11 @@
         "x": 2700.0,
         "y": -1479.0,
         "label": "Leave Shift-Change Hall",
-        "target": "hall:4"
+        "target": "hall:4",
+        "face": [
+          2700.0,
+          -1479.4
+        ]
       },
       "hall": 4,
       "side": "stbd"
@@ -2786,7 +2907,11 @@
         "x": 3040.0,
         "y": -1479.0,
         "label": "Leave Harbour Care Ward",
-        "target": "hall:0"
+        "target": "hall:0",
+        "face": [
+          3040.0,
+          -1479.4
+        ]
       },
       "hall": 0,
       "side": "port"
