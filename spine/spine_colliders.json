@@ -51,6 +51,308 @@
       "y": 7.0
     }
   ],
+  "terminals": [
+    {
+      "x": 130.0,
+      "y": -6.5,
+      "file": "air_quality_and_ventilation.md"
+    },
+    {
+      "x": 152.0,
+      "y": 6.5,
+      "file": "animals_and_pets_aboard.md"
+    },
+    {
+      "x": 174.0,
+      "y": -6.5,
+      "file": "arts_media_and_entertainment.md"
+    },
+    {
+      "x": 196.0,
+      "y": 6.5,
+      "file": "automation_and_robotics.md"
+    },
+    {
+      "x": 218.0,
+      "y": -6.5,
+      "file": "batch_clerks_message_runners.md"
+    },
+    {
+      "x": 240.0,
+      "y": 6.5,
+      "file": "berth_brokers_housing_swaps.md"
+    },
+    {
+      "x": 262.0,
+      "y": -6.5,
+      "file": "calendar_holidays_and_festivals.md"
+    },
+    {
+      "x": 284.0,
+      "y": 6.5,
+      "file": "captain_and_command_structure.md"
+    },
+    {
+      "x": 306.0,
+      "y": -6.5,
+      "file": "cargo_and_freight_contracts.md"
+    },
+    {
+      "x": 328.0,
+      "y": 6.5,
+      "file": "childhood_and_growing_up_aboard.md"
+    },
+    {
+      "x": 350.0,
+      "y": -6.5,
+      "file": "chronists_ship_clock_keepers.md"
+    },
+    {
+      "x": 372.0,
+      "y": 6.5,
+      "file": "clothing_textiles_and_laundry.md"
+    },
+    {
+      "x": 394.0,
+      "y": -6.5,
+      "file": "communications_and_intranet.md"
+    },
+    {
+      "x": 416.0,
+      "y": 6.5,
+      "file": "crew_culture_and_seafarer_traditions.md"
+    },
+    {
+      "x": 438.0,
+      "y": -6.5,
+      "file": "crime_and_justice_in_practice.md"
+    },
+    {
+      "x": 460.0,
+      "y": 6.5,
+      "file": "cuisine_and_regional_foods.md"
+    },
+    {
+      "x": 482.0,
+      "y": -6.5,
+      "file": "daily_life_and_routines.md"
+    },
+    {
+      "x": 504.0,
+      "y": 6.5,
+      "file": "daylight_and_lighting.md"
+    },
+    {
+      "x": 526.0,
+      "y": -6.5,
+      "file": "economics_and_trade.md"
+    },
+    {
+      "x": 548.0,
+      "y": 6.5,
+      "file": "elder_care_and_end_of_life.md"
+    },
+    {
+      "x": 570.0,
+      "y": -6.5,
+      "file": "elections_and_political_groupings.md"
+    },
+    {
+      "x": 592.0,
+      "y": 6.5,
+      "file": "emergency_response_and_evacuation.md"
+    },
+    {
+      "x": 614.0,
+      "y": -6.5,
+      "file": "environmental_impact_and_ocean_ecology.md"
+    },
+    {
+      "x": 636.0,
+      "y": 6.5,
+      "file": "food_and_agriculture.md"
+    },
+    {
+      "x": 658.0,
+      "y": -6.5,
+      "file": "gait_coaches_balance_instructors.md"
+    },
+    {
+      "x": 680.0,
+      "y": 6.5,
+      "file": "governance_and_law.md"
+    },
+    {
+      "x": 702.0,
+      "y": -6.5,
+      "file": "halcyon_meridian_general_description.md"
+    },
+    {
+      "x": 724.0,
+      "y": 6.5,
+      "file": "history_and_construction_timeline.md"
+    },
+    {
+      "x": 746.0,
+      "y": -6.5,
+      "file": "hospital_and_medical_care.md"
+    },
+    {
+      "x": 768.0,
+      "y": 6.5,
+      "file": "housing_and_residential_terraces.md"
+    },
+    {
+      "x": 790.0,
+      "y": -6.5,
+      "file": "immigration_citizenship_and_visitors.md"
+    },
+    {
+      "x": 812.0,
+      "y": 6.5,
+      "file": "insurance_and_risk_finance.md"
+    },
+    {
+      "x": 834.0,
+      "y": -6.5,
+      "file": "internal_transport.md"
+    },
+    {
+      "x": 856.0,
+      "y": 6.5,
+      "file": "knock_codes_and_cabin_talk.md"
+    },
+    {
+      "x": 878.0,
+      "y": -6.5,
+      "file": "labor_unions_and_crew_associations.md"
+    },
+    {
+      "x": 900.0,
+      "y": 6.5,
+      "file": "language_culture_and_social_classes.md"
+    },
+    {
+      "x": 922.0,
+      "y": -6.5,
+      "file": "lighter_folk_tender_crews.md"
+    },
+    {
+      "x": 944.0,
+      "y": 6.5,
+      "file": "maintenance_refits_and_in_water_repair.md"
+    },
+    {
+      "x": 966.0,
+      "y": -6.5,
+      "file": "markets_and_commerce.md"
+    },
+    {
+      "x": 988.0,
+      "y": 6.5,
+      "file": "marriage_family_and_relationships.md"
+    },
+    {
+      "x": 1010.0,
+      "y": -6.5,
+      "file": "navigation_and_weather.md"
+    },
+    {
+      "x": 1032.0,
+      "y": 6.5,
+      "file": "piracy_security_and_threats.md"
+    },
+    {
+      "x": 1054.0,
+      "y": -6.5,
+      "file": "population_and_demographics.md"
+    },
+    {
+      "x": 1076.0,
+      "y": 6.5,
+      "file": "ports_of_call.md"
+    },
+    {
+      "x": 1098.0,
+      "y": -6.5,
+      "file": "propulsion_and_power.md"
+    },
+    {
+      "x": 1120.0,
+      "y": 6.5,
+      "file": "reactor_operations_and_nuclear_safety.md"
+    },
+    {
+      "x": 1142.0,
+      "y": -6.5,
+      "file": "religion_and_chaplaincy.md"
+    },
+    {
+      "x": 1164.0,
+      "y": 6.5,
+      "file": "research_and_marine_science.md"
+    },
+    {
+      "x": 1186.0,
+      "y": -6.5,
+      "file": "sail_handling_and_sail_crew.md"
+    },
+    {
+      "x": 1208.0,
+      "y": 6.5,
+      "file": "schools_and_education.md"
+    },
+    {
+      "x": 1230.0,
+      "y": -6.5,
+      "file": "ship_legends_and_folklore.md"
+    },
+    {
+      "x": 1252.0,
+      "y": 6.5,
+      "file": "ship_structure_and_layout.md"
+    },
+    {
+      "x": 1274.0,
+      "y": -6.5,
+      "file": "shore_clocks_and_home_time.md"
+    },
+    {
+      "x": 1296.0,
+      "y": 6.5,
+      "file": "solid_waste_and_recycling.md"
+    },
+    {
+      "x": 1318.0,
+      "y": -6.5,
+      "file": "sports_and_athletics.md"
+    },
+    {
+      "x": 1340.0,
+      "y": 6.5,
+      "file": "surveillance_privacy_and_data.md"
+    },
+    {
+      "x": 1362.0,
+      "y": -6.5,
+      "file": "tally_walls_and_countdowns.md"
+    },
+    {
+      "x": 1384.0,
+      "y": 6.5,
+      "file": "tank_listeners_water_vault_sounders.md"
+    },
+    {
+      "x": 1406.0,
+      "y": -6.5,
+      "file": "voyage_dating_and_naming_customs.md"
+    },
+    {
+      "x": 1428.0,
+      "y": 6.5,
+      "file": "water_and_sanitation.md"
+    }
+  ],
   "train": {
     "length": 69.0,
     "half_width": 1.5,
@@ -1650,6 +1952,666 @@
         4.0
       ],
       "radius": 0.08
+    },
+    {
+      "type": "box",
+      "min": [
+        129.65,
+        -6.75
+      ],
+      "max": [
+        130.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        151.65,
+        6.25
+      ],
+      "max": [
+        152.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        173.65,
+        -6.75
+      ],
+      "max": [
+        174.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        195.65,
+        6.25
+      ],
+      "max": [
+        196.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        217.65,
+        -6.75
+      ],
+      "max": [
+        218.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        239.65,
+        6.25
+      ],
+      "max": [
+        240.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        261.65,
+        -6.75
+      ],
+      "max": [
+        262.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        283.65,
+        6.25
+      ],
+      "max": [
+        284.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        305.65,
+        -6.75
+      ],
+      "max": [
+        306.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        327.65,
+        6.25
+      ],
+      "max": [
+        328.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        349.65,
+        -6.75
+      ],
+      "max": [
+        350.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        371.65,
+        6.25
+      ],
+      "max": [
+        372.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        393.65,
+        -6.75
+      ],
+      "max": [
+        394.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        415.65,
+        6.25
+      ],
+      "max": [
+        416.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        437.65,
+        -6.75
+      ],
+      "max": [
+        438.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        459.65,
+        6.25
+      ],
+      "max": [
+        460.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        481.65,
+        -6.75
+      ],
+      "max": [
+        482.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        503.65,
+        6.25
+      ],
+      "max": [
+        504.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        525.65,
+        -6.75
+      ],
+      "max": [
+        526.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        547.65,
+        6.25
+      ],
+      "max": [
+        548.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        569.65,
+        -6.75
+      ],
+      "max": [
+        570.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        591.65,
+        6.25
+      ],
+      "max": [
+        592.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        613.65,
+        -6.75
+      ],
+      "max": [
+        614.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        635.65,
+        6.25
+      ],
+      "max": [
+        636.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        657.65,
+        -6.75
+      ],
+      "max": [
+        658.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        679.65,
+        6.25
+      ],
+      "max": [
+        680.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        701.65,
+        -6.75
+      ],
+      "max": [
+        702.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        723.65,
+        6.25
+      ],
+      "max": [
+        724.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        745.65,
+        -6.75
+      ],
+      "max": [
+        746.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        767.65,
+        6.25
+      ],
+      "max": [
+        768.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        789.65,
+        -6.75
+      ],
+      "max": [
+        790.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        811.65,
+        6.25
+      ],
+      "max": [
+        812.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        833.65,
+        -6.75
+      ],
+      "max": [
+        834.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        855.65,
+        6.25
+      ],
+      "max": [
+        856.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        877.65,
+        -6.75
+      ],
+      "max": [
+        878.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        899.65,
+        6.25
+      ],
+      "max": [
+        900.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        921.65,
+        -6.75
+      ],
+      "max": [
+        922.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        943.65,
+        6.25
+      ],
+      "max": [
+        944.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        965.65,
+        -6.75
+      ],
+      "max": [
+        966.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        987.65,
+        6.25
+      ],
+      "max": [
+        988.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        1009.65,
+        -6.75
+      ],
+      "max": [
+        1010.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        1031.65,
+        6.25
+      ],
+      "max": [
+        1032.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        1053.65,
+        -6.75
+      ],
+      "max": [
+        1054.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        1075.65,
+        6.25
+      ],
+      "max": [
+        1076.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        1097.65,
+        -6.75
+      ],
+      "max": [
+        1098.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        1119.65,
+        6.25
+      ],
+      "max": [
+        1120.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        1141.65,
+        -6.75
+      ],
+      "max": [
+        1142.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        1163.65,
+        6.25
+      ],
+      "max": [
+        1164.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        1185.65,
+        -6.75
+      ],
+      "max": [
+        1186.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        1207.65,
+        6.25
+      ],
+      "max": [
+        1208.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        1229.65,
+        -6.75
+      ],
+      "max": [
+        1230.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        1251.65,
+        6.25
+      ],
+      "max": [
+        1252.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        1273.65,
+        -6.75
+      ],
+      "max": [
+        1274.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        1295.65,
+        6.25
+      ],
+      "max": [
+        1296.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        1317.65,
+        -6.75
+      ],
+      "max": [
+        1318.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        1339.65,
+        6.25
+      ],
+      "max": [
+        1340.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        1361.65,
+        -6.75
+      ],
+      "max": [
+        1362.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        1383.65,
+        6.25
+      ],
+      "max": [
+        1384.35,
+        6.75
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        1405.65,
+        -6.75
+      ],
+      "max": [
+        1406.35,
+        -6.25
+      ]
+    },
+    {
+      "type": "box",
+      "min": [
+        1427.65,
+        6.25
+      ],
+      "max": [
+        1428.35,
+        6.75
+      ]
     }
   ]
 }

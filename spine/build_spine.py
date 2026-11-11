@@ -224,6 +224,25 @@ while x <= SPINE_X1 - 20.0:
     lamp_index += 1
     x += 40.0
 
+# --- Lore terminals: one per lore file, along the aisle -------------------------
+# Terminal i opens lore file i (alphabetical). The viewer reads the mapping from the JSON.
+LORE_DIR = r"C:\Users\jaspe\Documents\agentbox\lore"
+lore_files = sorted(f for f in os.listdir(LORE_DIR) if f.lower().endswith(".md"))
+TERMINAL_SPACING = 22.0
+TERMINAL_START = 130.0
+TERMINAL_MAT = make_mat("Terminal", (0.12, 0.13, 0.15), rough=0.5, metal=0.3)
+SCREEN_MAT = make_mat("TerminalScreen", (0.45, 0.90, 1.0), rough=0.3, emit=1.2)
+terminal_records = []
+for i, fname in enumerate(lore_files):
+    x = TERMINAL_START + TERMINAL_SPACING * i
+    if x > SPINE_X1 - 20.0:
+        raise SystemExit(f"Not enough Spine length for {len(lore_files)} terminals")
+    y = -6.5 if i % 2 == 0 else 6.5
+    dy = 0.26 if y < 0 else -0.26          # screen faces the centre aisle
+    box(f"Terminal_{i}", x - 0.35, x + 0.35, y - 0.25, y + 0.25, 0, 1.5, TERMINAL_MAT, collide=True)
+    box(f"TerminalScreen_{i}", x - 0.30, x + 0.30, y + dy - 0.01, y + dy + 0.01, 0.9, 1.35, SCREEN_MAT)
+    terminal_records.append({"x": x, "y": y, "file": fname})
+
 # --- Electric train on the centre track ----------------------------------------
 # Three cars parented to an empty named "Train". The viewer moves the empty along X.
 # The train's rear (aft) end is at X = 0 in this model; cars are 22 m long, 1.5 m gap.
@@ -254,6 +273,7 @@ with open(json_path, "w") as f:
         "bounds": {"min": [SPINE_X0, -SPINE_HALF_WIDTH], "max": [SPINE_X1, SPINE_HALF_WIDTH]},
         "spine": {"x0": SPINE_X0, "x1": SPINE_X1, "length": SPINE_X1 - SPINE_X0},
         "pois": poi_records,
+        "terminals": terminal_records,
         "train": {"length": TRAIN_LENGTH, "half_width": 1.5, "speed": 6.94},
         "colliders": colliders,
     }, f, indent=2)

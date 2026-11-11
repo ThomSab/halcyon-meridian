@@ -8,7 +8,7 @@
   html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; }
   #overlay {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-    background: rgba(0, 0, 0, 0.55); color: #fff; cursor: pointer; text-align: center;
+    background: rgba(0, 0, 0, 0.55); color: #fff; cursor: pointer; text-align: center; z-index: 10;
   }
   #overlay.hidden { display: none; }
   #overlay div { background: rgba(0, 0, 0, 0.6); padding: 16px 24px; border-radius: 6px; line-height: 1.6; }
@@ -26,13 +26,19 @@
     pointer-events: none; display: none;
   }
   #panel {
-    position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); width: min(640px, 90%);
-    color: #fff; background: rgba(0, 0, 0, 0.75); padding: 12px 16px; border-radius: 6px;
-    line-height: 1.5; display: none; pointer-events: none;
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: min(780px, 92vw); max-height: 84vh; box-sizing: border-box; display: none;
+    flex-direction: column; background: rgba(12, 14, 18, 0.95); color: #eee;
+    padding: 14px 18px; border-radius: 8px; z-index: 6;
   }
-  #panel h3 { margin: 0 0 6px 0; font-size: 17px; color: #ffd66b; }
-  #panel p { margin: 0 0 6px 0; font-size: 14px; }
-  #panel small { color: #aab; font-size: 11px; }
+  #panel .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  #panel h3 { margin: 0 0 8px 0; font-size: 17px; color: #ffd66b; }
+  #panel button { cursor: pointer; padding: 4px 12px; font-size: 13px; }
+  #ptext {
+    overflow: auto; white-space: pre-wrap; font-size: 13px; line-height: 1.5;
+    flex: 1; min-height: 0; padding-right: 6px;
+  }
+  #psource { color: #aab; font-size: 11px; margin-top: 8px; }
 </style>
 <script type="importmap">
 {
@@ -44,11 +50,15 @@
 </script>
 </head>
 <body>
-<div id="overlay"><div>Click to start<br><small>WASD / arrows to walk, Shift to run, mouse to look, Esc to release</small></div></div>
+<div id="overlay"><div>Click to start<br><small>WASD / arrows to walk, Shift to run, mouse to look, Esc to release<br>E to interact, J for the lore journal</small></div></div>
 <div id="hud">The Spine - Halcyon Meridian</div>
 <canvas id="map" width="360" height="56"></canvas>
 <div id="prompt"></div>
-<div id="panel"><h3 id="ptitle"></h3><p id="ptext"></p><small id="psource"></small></div>
+<div id="panel">
+  <div class="top"><h3 id="ptitle"></h3><button id="pclose">Close</button></div>
+  <div id="ptext"></div>
+  <div id="psource"></div>
+</div>
 
 <script type="module">
 import * as THREE from 'three';
@@ -59,6 +69,7 @@ const PLAYER_RADIUS = 0.35;
 const EYE_HEIGHT = 1.7;
 const WALK_SPEED = 3.0;   // m/s
 const RUN_SPEED = 6.0;    // m/s
+const LORE_TOTAL_KEY = 'halcyon-lore-found';
 
 // --- Renderer, scene, camera --------------------------------------------------
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -75,20 +86,25 @@ const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerH
 // --- Lighting (skylight from above) ------------------------------------------
 scene.add(new THREE.HemisphereLight(0xe8f0ff, 0x3a3a3a, 1.2));
 const sun = new THREE.DirectionalLight(0xffffff, 1.2);
-sun.position.set(-200, 400, 100);   // three.js coordinates (Y is up)
+sun.position.set(-200, 400, 100);
 scene.add(sun);
 
-// --- Controls -----------------------------------------------------------------
+// --- Controls and overlay -----------------------------------------------------
 const controls = new PointerLockControls(camera, renderer.domElement);
 const overlay = document.getElementById('overlay');
+let panelOpen = false;     // reading panel or journal is open (mouse is released)
+let journalOpen = false;
+
 overlay.addEventListener('click', () => controls.lock());
 controls.addEventListener('lock', () => overlay.classList.add('hidden'));
-controls.addEventListener('unlock', () => overlay.classList.remove('hidden'));
+controls.addEventListener('unlock', () => { if (!panelOpen) overlay.classList.remove('hidden'); });
 
 const keys = {};
 document.addEventListener('keydown', e => {
   keys[e.code] = true;
-  if (e.code === 'KeyE' && !e.repeat) togglePoi();
+  if (e.repeat) return;
+  if (e.code === 'KeyE') useNearest();
+  if (e.code === 'KeyJ') toggleJournal();
 });
 document.addEventListener('keyup', e => { keys[e.code] = false; });
 
@@ -96,6 +112,32 @@ document.addEventListener('keyup', e => { keys[e.code] = false; });
 let bounds = { min: [0, -20], max: [1600, 20] };
 let colliders = [];
 let spine = { x0: 0, x1: 1600, length: 1600 };
+
+// Electric train: an Object3D named "Train" in the GLB. Its position.x is the Blender X of
+// the rear (aft) end. It runs between the two ends of the Spine and pauses at each end.
+let train = null;
+let trainSpec = { length: 69, half_width: 1.5, speed: 6.94 };
+let trainMin = 130, trainMax = 1400;
+let trainX = 130;
+let trainDir = 1;
+let trainPause = 0;
+const TRAIN_PAUSE_SECONDS = 6;
+
+function trainBox(margin) {
+  return { x0: trainX - margin, x1: trainX + trainSpec.length + margin, hw: trainSpec.half_width + margin };
+}
+
+function updateTrain(dt) {
+  if (!train) return;
+  if (trainPause > 0) {
+    trainPause -= dt;
+  } else {
+    trainX += trainDir * trainSpec.speed * dt;
+    if (trainX >= trainMax) { trainX = trainMax; trainDir = -1; trainPause = TRAIN_PAUSE_SECONDS; }
+    if (trainX <= trainMin) { trainX = trainMin; trainDir = 1; trainPause = TRAIN_PAUSE_SECONDS; }
+  }
+  train.position.x = trainX;
+}
 
 function blocked(bx, by) {
   if (bx < bounds.min[0] + PLAYER_RADIUS || bx > bounds.max[0] - PLAYER_RADIUS) return true;
@@ -121,7 +163,6 @@ function blocked(bx, by) {
 const forward = new THREE.Vector3();
 const right = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
-const hud = document.getElementById('hud');
 
 function updateMovement(dt) {
   if (!controls.isLocked) return;
@@ -156,7 +197,6 @@ function updateMovement(dt) {
   // Blender y runs opposite to three.js z (by = -three.z), so the y step is negated.
   const my = -(dz / len) * speed;
 
-  // Blender coords: bx = three.x, by = -three.z
   const bx = camera.position.x;
   const by = -camera.position.z;
 
@@ -173,47 +213,138 @@ function updateMovement(dt) {
   camera.position.z = -ny;
 }
 
-function updateHud() {
-  const bx = camera.position.x;
-  const along = Math.min(Math.max(bx - spine.x0, 0), spine.length).toFixed(0);
-  hud.textContent = `The Spine - Halcyon Meridian | ${along} m along the Spine (of ${spine.length.toFixed(0)} m)`;
+// --- Lore: loading, parsing, discovery ----------------------------------------
+let lore = {};          // file name -> { title, body }
+let discovered = new Set();
+
+function parseLore(md, fallbackTitle) {
+  const lines = md.split(/\r?\n/);
+  const headingIndex = lines.findIndex(l => l.startsWith('# '));
+  const title = headingIndex >= 0 ? lines[headingIndex].replace(/^#\s*/, '').trim() : fallbackTitle;
+  if (headingIndex >= 0) lines.splice(headingIndex, 1);
+  const body = lines.join('\n')
+    .replace(/^#{2,6}\s*/gm, '')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .trim();
+  return { title, body };
 }
 
-// --- Points of interest -------------------------------------------------------
-const POI_RANGE = 5.0;   // metres
-const prompt = document.getElementById('prompt');
+function loadDiscovered() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LORE_TOTAL_KEY) || '[]');
+    discovered = new Set(saved);
+  } catch (e) {
+    discovered = new Set();
+  }
+}
+
+function discover(file) {
+  if (discovered.has(file)) return;
+  discovered.add(file);
+  try { localStorage.setItem(LORE_TOTAL_KEY, JSON.stringify([...discovered])); } catch (e) { /* storage may be unavailable */ }
+}
+
+// --- Interaction: nearest interactable, prompt, panel ------------------------
+const POI_RANGE = 5.0;
+const TERMINAL_RANGE = 2.5;
+const promptEl = document.getElementById('prompt');
 const panel = document.getElementById('panel');
 const panelTitle = document.getElementById('ptitle');
 const panelText = document.getElementById('ptext');
 const panelSource = document.getElementById('psource');
-let pois = [];
-let nearPoi = null;
-let openPoi = null;
+const panelClose = document.getElementById('pclose');
+let interactables = [];   // { x, y, range, label(), use() }
+let nearest = null;
 
-function openPanel(poi) {
-  openPoi = poi;
-  panelTitle.textContent = poi.name;
-  panelText.textContent = poi.text;
-  panelSource.textContent = 'Source: ' + poi.source;
-  panel.style.display = 'block';
+function showPanel(title, text, source) {
+  panelTitle.textContent = title;
+  panelText.textContent = text;
+  panelSource.textContent = source || '';
+  panel.style.display = 'flex';
+  panelText.scrollTop = 0;
+}
+
+function openReading({ title, text, source }) {
+  panelOpen = true;
+  journalOpen = false;
+  showPanel(title, text, source);
+  overlay.classList.add('hidden');
+  controls.unlock();
+}
+
+function openJournal() {
+  const total = lore ? Object.keys(lore).length : 0;
+  const files = terminalFiles();
+  const lines = files.map(file => {
+    if (!discovered.has(file)) return '[ ] (not found yet)';
+    return `[x] ${lore[file].title}`;
+  });
+  panelOpen = true;
+  journalOpen = true;
+  showPanel(`Lore journal: ${discovered.size} / ${total} found`,
+    'Find the lore terminals along the Spine (the glowing screens) and press E to read them.\n\n' +
+    lines.join('\n'), 'Entries unlock when you use their terminal.');
+  overlay.classList.add('hidden');
+  controls.unlock();
 }
 
 function closePanel() {
-  openPoi = null;
+  panelOpen = false;
+  journalOpen = false;
   panel.style.display = 'none';
+  controls.lock();
 }
 
-function togglePoi() {
-  if (!controls.isLocked) return;
-  if (openPoi) { closePanel(); return; }
-  if (nearPoi) openPanel(nearPoi);
+panelClose.addEventListener('click', closePanel);
+
+function toggleJournal() {
+  if (panelOpen && journalOpen) { closePanel(); return; }
+  if (!panelOpen) openJournal();
 }
 
-// --- Strip map (top right): the whole Spine as a bar -------------------------
+function useNearest() {
+  if (panelOpen) { closePanel(); return; }
+  if (nearest) nearest.use();
+}
+
+function terminalFiles() {
+  return terminals.map(t => t.file);
+}
+
+let terminals = [];
+let pois = [];
+
+function updateInteraction() {
+  const bx = camera.position.x;
+  const by = -camera.position.z;
+  let best = null, bestRatio = Infinity;
+  for (const it of interactables) {
+    const d = Math.hypot(it.x - bx, it.y - by);
+    if (d <= it.range && d / it.range < bestRatio) { bestRatio = d / it.range; best = it; }
+  }
+  nearest = best;
+  if (nearest && !panelOpen) {
+    promptEl.textContent = `[E] ${nearest.label()}`;
+    promptEl.style.display = 'block';
+  } else {
+    promptEl.style.display = 'none';
+  }
+}
+
+// --- HUD and strip map (top right) -------------------------------------------
+const hud = document.getElementById('hud');
 const mapCanvas = document.getElementById('map');
 const mapCtx = mapCanvas.getContext('2d');
 const MAP_PAD = 14;
 const MAP_TRACK_Y = 26;
+
+function updateHud() {
+  const bx = camera.position.x;
+  const along = Math.min(Math.max(bx - spine.x0, 0), spine.length).toFixed(0);
+  const total = Object.keys(lore).length;
+  hud.textContent = `The Spine - Halcyon Meridian | ${along} m along the Spine | Lore found ${discovered.size} / ${total}`;
+}
 
 function mapX(x) {
   const W = mapCanvas.width - 2 * MAP_PAD;
@@ -225,34 +356,33 @@ function drawMap() {
   const W = mapCanvas.width, H = mapCanvas.height;
   ctx.clearRect(0, 0, W, H);
 
-  // Spine bar and the two towers at either end
   ctx.fillStyle = '#6b6f76';
   ctx.fillRect(MAP_PAD, MAP_TRACK_Y - 3, W - 2 * MAP_PAD, 6);
   ctx.fillStyle = '#9aa4b2';
   ctx.fillRect(MAP_PAD - 8, MAP_TRACK_Y - 8, 8, 16);
   ctx.fillRect(W - MAP_PAD, MAP_TRACK_Y - 8, 8, 16);
 
-  // Points of interest
   ctx.fillStyle = '#ffd66b';
   for (const p of pois) {
     ctx.beginPath();
     ctx.arc(mapX(p.x), MAP_TRACK_Y, 3, 0, Math.PI * 2);
     ctx.fill();
   }
+  ctx.fillStyle = '#7fe8ff';
+  for (const t of terminals) {
+    ctx.fillRect(mapX(t.x) - 0.5, MAP_TRACK_Y - 9, 1.5, 4);
+  }
 
-  // Train
   if (train) {
     const x0 = mapX(trainX), x1 = mapX(trainX + trainSpec.length);
     ctx.fillStyle = '#3a8fd6';
     ctx.fillRect(x0, MAP_TRACK_Y - 2, Math.max(x1 - x0, 2), 4);
   }
 
-  // Player
   const px = mapX(camera.position.x);
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(px - 1, MAP_TRACK_Y - 12, 2, 24);
 
-  // Labels
   ctx.fillStyle = '#cfd6df';
   ctx.font = '10px sans-serif';
   ctx.fillText('AFT', 2, H - 6);
@@ -261,48 +391,7 @@ function drawMap() {
   ctx.textAlign = 'left';
 }
 
-function updatePois() {
-  const bx = camera.position.x;
-  const by = -camera.position.z;
-  let best = null, bestDist = Infinity;
-  for (const p of pois) {
-    const d = Math.hypot(p.x - bx, p.y - by);
-    if (d < bestDist) { bestDist = d; best = p; }
-  }
-  nearPoi = bestDist <= POI_RANGE ? best : null;
-  prompt.style.display = (nearPoi && !openPoi) ? 'block' : 'none';
-  if (nearPoi) prompt.textContent = `[E] ${nearPoi.name}`;
-  if (openPoi && (!nearPoi || nearPoi !== openPoi)) closePanel();
-}
-
-// --- Electric train on the centre track ---------------------------------------
-// The train is an Object3D named "Train" in the GLB. Its position.x is the Blender X of the
-// rear (aft) end; it runs between the two ends of the Spine and pauses at each end.
-let train = null;
-let trainSpec = { length: 69, half_width: 1.5, speed: 6.94 };
-let trainMin = 130, trainMax = 1400;
-let trainX = 130;
-let trainDir = 1;
-let trainPause = 0;
-const TRAIN_PAUSE_SECONDS = 6;
-
-function trainBox(margin) {
-  return { x0: trainX - margin, x1: trainX + trainSpec.length + margin, hw: trainSpec.half_width + margin };
-}
-
-function updateTrain(dt) {
-  if (!train) return;
-  if (trainPause > 0) {
-    trainPause -= dt;
-  } else {
-    trainX += trainDir * trainSpec.speed * dt;
-    if (trainX >= trainMax) { trainX = trainMax; trainDir = -1; trainPause = TRAIN_PAUSE_SECONDS; }
-    if (trainX <= trainMin) { trainX = trainMin; trainDir = 1; trainPause = TRAIN_PAUSE_SECONDS; }
-  }
-  train.position.x = trainX;
-}
-
-// --- Load model and collision data -------------------------------------------
+// --- Load model, collision data and lore --------------------------------------
 const loader = new GLTFLoader();
 const modelReady = new Promise((resolve, reject) =>
   loader.load('spine.glb', gltf => {
@@ -310,42 +399,84 @@ const modelReady = new Promise((resolve, reject) =>
     train = gltf.scene.getObjectByName('Train') || null;
     resolve();
   }, undefined, reject));
+
 const collisionReady = fetch('spine_colliders.json')
-  .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+  .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status + ' for spine_colliders.json'); return r.json(); })
   .then(data => {
     bounds = data.bounds;
     colliders = data.colliders;
     spine = data.spine;
     pois = data.pois || [];
+    terminals = data.terminals || [];
     if (data.train) trainSpec = data.train;
     trainMin = spine.x0 + 30;
     trainMax = spine.x1 - 30 - trainSpec.length;
     trainX = trainMin;
+    return data;
   });
 
-// Optional URL parameters, mainly for screenshots:
-//   ?x=800&y=0&yaw=0  start position (Blender metres) and heading (0 = fore, 90 = port)
-//   ?shot=1           hide the start overlay
-const params = new URLSearchParams(location.search);
-if (params.has('shot')) overlay.classList.add('hidden');
+// Each terminal opens one lore file. Files are read from the lore/ folder next to the repo root.
+const loreReady = collisionReady.then(data => {
+  const files = (data.terminals || []).map(t => t.file);
+  return Promise.all(files.map(file =>
+    fetch('../lore/' + encodeURIComponent(file))
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status + ' for ' + file); return r.text(); })
+      .then(md => { lore[file] = parseLore(md, file.replace(/\.md$/, '')); })
+  ));
+});
 
-Promise.all([modelReady, collisionReady]).then(() => {
+loadDiscovered();
+
+Promise.all([modelReady, collisionReady, loreReady]).then(() => {
+  // Interactables: points of interest and lore terminals.
+  for (const p of pois) {
+    interactables.push({
+      x: p.x, y: p.y, range: POI_RANGE,
+      label: () => p.name,
+      use: () => openReading({ title: p.name, text: p.text, source: p.source }),
+    });
+  }
+  for (const t of terminals) {
+    interactables.push({
+      x: t.x, y: t.y, range: TERMINAL_RANGE,
+      label: () => discovered.has(t.file) ? `Lore: ${lore[t.file].title}` : 'Lore terminal',
+      use: () => {
+        const entry = lore[t.file];
+        discover(t.file);
+        openReading({ title: entry.title, text: entry.body, source: 'lore/' + t.file });
+      },
+    });
+  }
+
   // Default: aft end of the Spine, in the centre aisle, looking fore.
+  const params = new URLSearchParams(location.search);
   const startX = params.has('x') ? parseFloat(params.get('x')) : spine.x0 + 20;
   const startY = params.has('y') ? parseFloat(params.get('y')) : 0;
   const yaw = (params.has('yaw') ? parseFloat(params.get('yaw')) : 0) * Math.PI / 180;
-  // Blender heading (cos, sin) maps to three.js (cos, -sin) on the X and Z axes.
   camera.position.set(startX, EYE_HEIGHT, -startY);
   camera.lookAt(startX + Math.cos(yaw) * 50, EYE_HEIGHT, -startY - Math.sin(yaw) * 50);
-  //   ?train=600        place the train at X = 600 m and hold it there (screenshots)
+
+  // Debug parameters (for screenshots):
+  //   ?shot=1        hide the start overlay
+  //   ?train=600     place the train at X = 600 m and hold it
+  //   ?open=N        open point of interest N
+  //   ?read=N        open lore terminal N (also marks it found)
+  //   ?journal=1     open the journal
+  if (params.has('shot')) overlay.classList.add('hidden');
   if (params.has('train') && train) {
     trainX = parseFloat(params.get('train'));
     trainPause = 1e9;
   }
-  //   ?open=N           open the text panel for point of interest N (screenshots)
   if (params.has('open') && pois[parseInt(params.get('open'), 10)]) {
-    openPanel(pois[parseInt(params.get('open'), 10)]);
+    const p = pois[parseInt(params.get('open'), 10)];
+    openReading({ title: p.name, text: p.text, source: p.source });
   }
+  if (params.has('read') && terminals[parseInt(params.get('read'), 10)]) {
+    const t = terminals[parseInt(params.get('read'), 10)];
+    discover(t.file);
+    openReading({ title: lore[t.file].title, text: lore[t.file].body, source: 'lore/' + t.file });
+  }
+  if (params.has('journal')) openJournal();
 }).catch(err => {
   document.querySelector('#overlay div').textContent = 'Failed to load: ' + err;
 });
@@ -358,8 +489,8 @@ function animate(timestamp) {
   const dt = Math.min(timer.getDelta(), 0.05);
   updateTrain(dt);
   updateMovement(dt);
+  updateInteraction();
   updateHud();
-  updatePois();
   drawMap();
   renderer.render(scene, camera);
 }
